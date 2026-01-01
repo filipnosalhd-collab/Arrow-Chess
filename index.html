@@ -4836,6 +4836,8 @@
 
       function makeBotMove() {
         if (G.gameOver) return;
+
+        // Sprawdź czy Nexus jest zagrożony
         for (var i = 0; i < G.pendingCaptures.length; i++) {
           var cap = G.pendingCaptures[i];
           if (cap.isNexusLock) {
@@ -4859,6 +4861,8 @@
             }
           }
         }
+
+        // Uciekaj zablokowanymi figurami
         for (var i = 0; i < G.pendingCaptures.length; i++) {
           var cap = G.pendingCaptures[i];
           if (!cap.isNexusLock) {
@@ -4882,13 +4886,76 @@
             }
           }
         }
+
         var allMoves = [];
+
+        // Zbierz ruchy Strażników (czarnych tarcz)
+        for (var s = 0; s < G.sentinelShields.length; s++) {
+          var shield = G.sentinelShields[s];
+          if (shield.color === "black") {
+            var guardianPiece = {
+              symbol: SENTINEL_GUARDIAN.symbol,
+              name: SENTINEL_GUARDIAN.name,
+              moves: SENTINEL_GUARDIAN.moves,
+              type: "guardian",
+              straightOnly: true,
+              color: "black",
+              isGuardian: true,
+              shieldIndex: s,
+            };
+            // Tymczasowo postaw strażnika
+            var gx = shield.guardianX,
+              gy = shield.guardianY;
+            if (!G.board[gy][gx]) {
+              G.board[gy][gx] = guardianPiece;
+              var guardianMoves = getAllMovesForPiece(
+                gx,
+                gy,
+                guardianPiece,
+                false
+              );
+              G.board[gy][gx] = null;
+
+              for (var m = 0; m < guardianMoves.length; m++) {
+                var path = guardianMoves[m];
+                if (path.length > 1) {
+                  var endPos = path[path.length - 1];
+                  var target = G.board[endPos.y][endPos.x];
+                  // Strażnik może tylko atakować (zamrażać)
+                  if (target && target.color === "white") {
+                    var score = 100; // Wysoki priorytet dla zamrożenia
+                    var vals = {
+                      king: 200,
+                      queen: 90,
+                      rook: 50,
+                      bishop: 35,
+                      knight: 30,
+                      pawn: 10,
+                    };
+                    score += vals[target.type] || 10;
+                    allMoves.push({
+                      from: { x: gx, y: gy, isGuardian: true, shieldIndex: s },
+                      path: path,
+                      piece: guardianPiece,
+                      score: score,
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Zbierz ruchy normalnych figur
         for (var y = 0; y < 8; y++) {
           for (var x = 0; x < 8; x++) {
             var piece = G.board[y][x];
             if (piece && piece.color === "black") {
               // Nie ruszaj figurą która atakuje
               if (isPieceAttacking(x, y)) continue;
+              // Nie ruszaj zamrożoną figurą
+              if (piece.frozenTurns && piece.frozenTurns > 0) continue;
+
               var moves = getAllMovesForPiece(x, y, piece, isPieceLocked(x, y));
               for (var m = 0; m < moves.length; m++) {
                 var path = moves[m];
@@ -4911,6 +4978,12 @@
                     (7 - Math.abs(endPos.x - 3.5) - Math.abs(endPos.y - 3.5)) *
                     2;
                   if (piece.type === "pawn") score += endPos.y * 3;
+
+                  // Bonus za tworzenie tarczy (wieże w linii)
+                  if (piece.type === "rook") {
+                    score += getBotShieldBonus(x, y, endPos.x, endPos.y);
+                  }
+
                   allMoves.push({
                     from: { x: x, y: y },
                     path: path,
@@ -4936,6 +5009,13 @@
         var selectedMove = pool[Math.floor(Math.random() * pool.length)];
         G.selectedPiece = selectedMove.from;
         G.plannedPath = selectedMove.path;
+
+        // Jeśli to strażnik, postaw go tymczasowo
+        if (selectedMove.from.isGuardian) {
+          G.board[selectedMove.from.y][selectedMove.from.x] =
+            selectedMove.piece;
+        }
+
         for (var j = 1; j < selectedMove.path.length; j++) {
           var prev = selectedMove.path[j - 1],
             curr = selectedMove.path[j];
@@ -4948,6 +5028,46 @@
           }
         }
         executeMove();
+      }
+
+      // Bonus dla bota za ustawianie wież w linii (tworzenie tarczy)
+      function getBotShieldBonus(fromX, fromY, toX, toY) {
+        var bonus = 0;
+        // Znajdź inne czarne wieże
+        for (var y = 0; y < 8; y++) {
+          for (var x = 0; x < 8; x++) {
+            var p = G.board[y][x];
+            if (
+              p &&
+              p.type === "rook" &&
+              p.color === "black" &&
+              !(x === fromX && y === fromY)
+            ) {
+              // Czy po ruchu będą w jednej linii?
+              if (toX === x || toY === y) {
+                // Sprawdź czy między nimi nie będzie figur
+                var clear = true;
+                if (toX === x) {
+                  var minY = Math.min(toY, y),
+                    maxY = Math.max(toY, y);
+                  for (var cy = minY + 1; cy < maxY; cy++) {
+                    if (G.board[cy][x] && !(cy === fromY && x === fromX))
+                      clear = false;
+                  }
+                } else {
+                  var minX = Math.min(toX, x),
+                    maxX = Math.max(toX, x);
+                  for (var cx = minX + 1; cx < maxX; cx++) {
+                    if (G.board[toY][cx] && !(toY === fromY && cx === fromX))
+                      clear = false;
+                  }
+                }
+                if (clear) bonus += 25; // Bonus za tworzenie tarczy
+              }
+            }
+          }
+        }
+        return bonus;
       }
 
       document.querySelectorAll(".nav-btn").forEach(function (btn) {
