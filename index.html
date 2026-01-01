@@ -4432,7 +4432,7 @@
           // Ale musimy usunąć tymczasową figurę
           G.board[startPos.y][startPos.x] = null;
         } else if (targetPiece && targetPiece.color !== piece.color) {
-          // Phantom - natychmiastowe zbicie (bez czasu na ucieczkę)
+          // Ofiara Phantom - natychmiastowe zbicie (Phantom nie może uciec)
           if (targetPiece.type === "queen") {
             (targetPiece.color === "white"
               ? G.capturedByBlack
@@ -4442,7 +4442,7 @@
             moveDesc =
               moveDesc || piece.symbol + " zbija " + targetPiece.symbol + "!";
           }
-          // Nexus - 1 tura na ucieczkę
+          // Nexus jako ofiara - 1 tura na ucieczkę
           else if (targetPiece.type === "king") {
             G.inCheck = targetPiece.color;
             G.pendingCaptures.push({
@@ -4460,7 +4460,7 @@
             moveDesc =
               moveDesc || piece.symbol + " blokuje " + targetPiece.symbol + "!";
           }
-          // Inne figury - 2 tury na ucieczkę
+          // Inne figury jako ofiara - 2 tury na ucieczkę
           else {
             G.pendingCaptures.push({
               attackerX: startPos.x,
@@ -4803,6 +4803,22 @@
             }
             if (inPath) continue;
             if (isLocked && targetPiece) continue;
+
+            // Jeśli na polu jest wroga figura - można tam wejść tylko jako ostatni krok
+            // NIE można przechodzić przez wrogie figury
+            var stepsUsed = path.length; // path zawiera start, więc stepsUsed = ile kroków zrobiliśmy
+            var isThisLastStep = stepsUsed >= piece.moves;
+            if (targetPiece && targetPiece.color !== piece.color) {
+              // Można zbić tylko w ostatnim kroku
+              if (isThisLastStep) {
+                var newPath = path.slice();
+                newPath.push({ x: newX, y: newY });
+                allMoves.push(newPath);
+              }
+              // Nie można iść dalej przez wroga
+              continue;
+            }
+
             var newPath = path.slice();
             newPath.push({ x: newX, y: newY });
             explore(newPath, usedDiag || dir.diagonal);
