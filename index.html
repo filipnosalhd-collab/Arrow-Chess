@@ -693,6 +693,81 @@
         z-index: 4;
         opacity: 0.7;
       }
+      /* Tarcza Sentinela */
+      .tile.sentinel-shield {
+        position: relative;
+      }
+      .tile.sentinel-shield::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        pointer-events: none;
+        z-index: 1;
+      }
+      .tile.white-shield::after {
+        background: linear-gradient(
+          135deg,
+          rgba(224, 232, 255, 0.3),
+          rgba(224, 232, 255, 0.1)
+        );
+        border: 2px solid rgba(224, 232, 255, 0.5);
+        box-shadow: inset 0 0 15px rgba(224, 232, 255, 0.4);
+      }
+      .tile.black-shield::after {
+        background: linear-gradient(
+          135deg,
+          rgba(255, 0, 170, 0.3),
+          rgba(255, 0, 170, 0.1)
+        );
+        border: 2px solid rgba(255, 0, 170, 0.5);
+        box-shadow: inset 0 0 15px rgba(255, 0, 170, 0.4);
+      }
+      .piece.guardian {
+        animation: guardianPulse 2s infinite;
+      }
+      @keyframes guardianPulse {
+        0%,
+        100% {
+          filter: brightness(1);
+        }
+        50% {
+          filter: brightness(1.3);
+        }
+      }
+      /* Zamrożenie */
+      .piece.frozen {
+        filter: brightness(0.7) saturate(0.5);
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .piece.frozen::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: radial-gradient(
+          circle,
+          rgba(100, 200, 255, 0.3),
+          transparent
+        );
+        pointer-events: none;
+      }
+      .frozen-timer {
+        position: absolute;
+        bottom: 2px;
+        left: 2px;
+        font-size: 0.7rem;
+        color: #00d4ff;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 1px 4px;
+        border-radius: 3px;
+        z-index: 5;
+      }
       /* Online / Profil */
       .profile-bar {
         position: absolute;
@@ -1911,7 +1986,8 @@
                   <strong>Dozwolone kierunki:</strong> Wszystkie 8 kierunków<br />
                   <strong>Specjalne zasady:</strong><br />
                   • Najpotężniejsza figura ofensywna w grze<br />
-                  • Duży zasięg pozwala na szybkie ataki z daleka<br />
+                  • <strong>NATYCHMIASTOWE ZBICIE</strong> – Phantom nie daje
+                  czasu na ucieczkę!<br />
                   • Pamiętaj o zasadzie 1 skosu na turę!
                 </p>
               </div>
@@ -1926,8 +2002,11 @@
                   (góra, dół, lewo, prawo)<br />
                   <strong>Specjalne zasady:</strong><br />
                   • NIE MOŻE poruszać się po skosie w ogóle<br />
-                  • Idealny do kontrolowania linii poziomych i pionowych<br />
-                  • Silny w otwartej grze (gdy ścieżki są wolne)
+                  • <strong>TARCZA SENTINELA:</strong> Gdy dwie wieże tego
+                  samego koloru stoją w jednej linii (pionowej lub poziomej) bez
+                  figur między nimi, tworzą "Tarczę" – przeciwnik nie może
+                  przechodzić przez pola między nimi!<br />
+                  • Na środku Tarczy pojawia się Strażnik (⊕)
                 </p>
               </div>
             </div>
@@ -1936,12 +2015,12 @@
               <div class="piece-card-info">
                 <h4>Shade (◇) – Goniec</h4>
                 <p>
-                  <strong>Liczba kroków:</strong> do 4<br />
+                  <strong>Liczba kroków:</strong> 1<br />
                   <strong>Dozwolone kierunki:</strong> Tylko 4 kierunki
                   skośne<br />
                   <strong>Specjalne zasady:</strong><br />
                   • NIE MOŻE poruszać się prosto w ogóle<br />
-                  • Kontroluje przekątne planszy<br />
+                  • Krótki zasięg, ale kontroluje przekątne<br />
                   • Każdy gracz ma 2 Shade'y – jeden na jasnych polach, jeden na
                   ciemnych
                 </p>
@@ -2549,7 +2628,7 @@
         BISHOP: {
           symbol: "◇",
           name: "Shade",
-          moves: 4,
+          moves: 1,
           type: "bishop",
           diagonalOnly: true,
         },
@@ -2598,7 +2677,98 @@
         whatIfCapturedB: null,
         whatIfPlayer: null,
         isAnimating: false,
+        sentinelShields: [],
       };
+
+      // Tarcza Sentinela - specjalna figura tworzona przez dwie wieże w linii
+      const SENTINEL_GUARDIAN = {
+        symbol: "⊕",
+        name: "Strażnik",
+        moves: 4,
+        type: "guardian",
+        straightOnly: true,
+      };
+
+      // Sprawdź czy dwie wieże tworzą Tarczę Sentinela
+      function checkSentinelShields() {
+        G.sentinelShields = [];
+
+        // Znajdź wszystkie wieże
+        var rooks = [];
+        for (var y = 0; y < 8; y++) {
+          for (var x = 0; x < 8; x++) {
+            var piece = G.board[y][x];
+            if (piece && piece.type === "rook") {
+              rooks.push({ x: x, y: y, color: piece.color });
+            }
+          }
+        }
+
+        // Sprawdź pary wież tego samego koloru
+        for (var i = 0; i < rooks.length; i++) {
+          for (var j = i + 1; j < rooks.length; j++) {
+            var r1 = rooks[i],
+              r2 = rooks[j];
+            if (r1.color !== r2.color) continue;
+
+            // Czy są w tej samej linii (pionowej lub poziomej)?
+            if (r1.x === r2.x || r1.y === r2.y) {
+              // Sprawdź czy między nimi nie ma innych figur
+              var blocked = false;
+              var tiles = [];
+
+              if (r1.x === r2.x) {
+                // Pionowa linia
+                var minY = Math.min(r1.y, r2.y);
+                var maxY = Math.max(r1.y, r2.y);
+                for (var y = minY + 1; y < maxY; y++) {
+                  tiles.push({ x: r1.x, y: y });
+                  if (G.board[y][r1.x]) blocked = true;
+                }
+              } else {
+                // Pozioma linia
+                var minX = Math.min(r1.x, r2.x);
+                var maxX = Math.max(r1.x, r2.x);
+                for (var x = minX + 1; x < maxX; x++) {
+                  tiles.push({ x: x, y: r1.y });
+                  if (G.board[r1.y][x]) blocked = true;
+                }
+              }
+
+              if (!blocked && tiles.length > 0) {
+                // Środek tarczy - tam pojawi się Strażnik
+                var midIndex = Math.floor(tiles.length / 2);
+                var guardianPos = tiles[midIndex];
+
+                G.sentinelShields.push({
+                  color: r1.color,
+                  rook1: { x: r1.x, y: r1.y },
+                  rook2: { x: r2.x, y: r2.y },
+                  tiles: tiles,
+                  guardianX: guardianPos.x,
+                  guardianY: guardianPos.y,
+                });
+              }
+            }
+          }
+        }
+      }
+
+      // Sprawdź czy pole jest zablokowane przez Tarczę Sentinela (dla przeciwnika)
+      function isBlockedByShield(x, y, movingColor) {
+        for (var i = 0; i < G.sentinelShields.length; i++) {
+          var shield = G.sentinelShields[i];
+          // Tarcza blokuje tylko przeciwnika
+          if (shield.color === movingColor) continue;
+
+          for (var j = 0; j < shield.tiles.length; j++) {
+            if (shield.tiles[j].x === x && shield.tiles[j].y === y) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
 
       // Profil i Online
       let playerProfile = localStorage.getItem("arrowChessProfile") || null;
@@ -3496,11 +3666,37 @@
               tile.classList.add("threat");
             }
 
+            // Sprawdź czy pole jest częścią Tarczy Sentinela
+            var shieldInfo = getShieldAtTile(x, y);
+            if (shieldInfo) {
+              tile.classList.add("sentinel-shield");
+              tile.classList.add(shieldInfo.color + "-shield");
+
+              // Jeśli to miejsce Strażnika
+              if (shieldInfo.isGuardian && !piece) {
+                var guardianEl = document.createElement("div");
+                guardianEl.className = "piece guardian " + shieldInfo.color;
+                guardianEl.innerHTML =
+                  '<span class="piece-symbol">' +
+                  SENTINEL_GUARDIAN.symbol +
+                  "</span>";
+                tile.appendChild(guardianEl);
+              }
+            }
+
             if (piece) {
               var pieceEl = document.createElement("div");
               pieceEl.className = "piece " + piece.color;
               if (isPieceAttacking(x, y)) {
                 pieceEl.classList.add("attacking");
+              }
+              if (piece.frozenTurns && piece.frozenTurns > 0) {
+                pieceEl.classList.add("frozen");
+                // Dodaj licznik zamrożenia
+                var frozenTimer = document.createElement("div");
+                frozenTimer.className = "frozen-timer";
+                frozenTimer.textContent = "❄" + piece.frozenTurns;
+                tile.appendChild(frozenTimer);
               }
               pieceEl.innerHTML =
                 '<span class="piece-symbol">' + piece.symbol + "</span>";
@@ -3536,6 +3732,34 @@
 
         // Renderuj strzałki analizy (SVG overlay)
         renderAnalysisArrows();
+      }
+
+      function getShieldAtTile(x, y) {
+        for (var i = 0; i < G.sentinelShields.length; i++) {
+          var shield = G.sentinelShields[i];
+          for (var j = 0; j < shield.tiles.length; j++) {
+            if (shield.tiles[j].x === x && shield.tiles[j].y === y) {
+              return {
+                color: shield.color,
+                isGuardian: shield.guardianX === x && shield.guardianY === y,
+              };
+            }
+          }
+        }
+        return null;
+      }
+
+      function getGuardianAt(x, y) {
+        for (var i = 0; i < G.sentinelShields.length; i++) {
+          var shield = G.sentinelShields[i];
+          if (shield.guardianX === x && shield.guardianY === y) {
+            return {
+              color: shield.color,
+              shieldIndex: i,
+            };
+          }
+        }
+        return null;
       }
 
       function renderAnalysisArrows() {
@@ -3786,6 +4010,9 @@
           if (targetPiece && targetPiece.color !== piece.color && !isLastStep)
             continue;
 
+          // Sprawdź Tarczę Sentinela - nie można wejść na pola tarczy przeciwnika
+          if (isBlockedByShield(newX, newY, piece.color)) continue;
+
           validMoves.push({ x: newX, y: newY, diagonal: dir.diagonal });
         }
         return validMoves;
@@ -3904,14 +4131,41 @@
         if (!canMakeMove()) return;
 
         var piece = G.board[y][x];
+
+        // Sprawdź czy kliknięto na Strażnika (wirtualna figura)
+        var guardianInfo = getGuardianAt(x, y);
+        if (guardianInfo && guardianInfo.color === G.currentPlayer && !piece) {
+          piece = {
+            symbol: SENTINEL_GUARDIAN.symbol,
+            name: SENTINEL_GUARDIAN.name,
+            moves: SENTINEL_GUARDIAN.moves,
+            type: "guardian",
+            straightOnly: true,
+            color: guardianInfo.color,
+            isGuardian: true,
+            shieldIndex: guardianInfo.shieldIndex,
+          };
+        }
+
         var validMoves = getValidNextSteps();
 
         if (!G.selectedPiece) {
           if (piece && piece.color === G.currentPlayer) {
             if (isPieceAttacking(x, y)) return;
-            G.selectedPiece = { x: x, y: y };
+            // Nie można ruszać zamrożoną figurą
+            if (piece.frozenTurns && piece.frozenTurns > 0) return;
+            G.selectedPiece = {
+              x: x,
+              y: y,
+              isGuardian: piece.isGuardian,
+              shieldIndex: piece.shieldIndex,
+            };
             G.plannedPath = [{ x: x, y: y }];
             G.usedDiagonal = false;
+            // Tymczasowo "postaw" strażnika na planszy żeby getValidNextSteps działało
+            if (piece.isGuardian) {
+              G.board[y][x] = piece;
+            }
             renderBoard();
             updateUI();
           }
@@ -3922,6 +4176,10 @@
           G.selectedPiece.y === y &&
           G.plannedPath.length === 1
         ) {
+          // Usuń tymczasowego strażnika
+          if (G.selectedPiece.isGuardian) {
+            G.board[y][x] = null;
+          }
           G.selectedPiece = null;
           G.plannedPath = [];
           G.usedDiagonal = false;
@@ -4158,8 +4416,34 @@
 
         G.board[startPos.y][startPos.x] = null;
 
-        if (targetPiece && targetPiece.color !== piece.color) {
-          if (targetPiece.type === "king") {
+        // Strażnik - zamraża wroga na 2 tury i znika (tarcza też znika)
+        if (
+          piece.isGuardian &&
+          targetPiece &&
+          targetPiece.color !== piece.color
+        ) {
+          // Zamroź ofiarę
+          if (!targetPiece.frozenTurns) targetPiece.frozenTurns = 0;
+          targetPiece.frozenTurns = 2;
+          moveDesc =
+            moveDesc ||
+            piece.symbol + " zamraża " + targetPiece.symbol + " na 2 tury!";
+          // Strażnik znika - tarcza zostaje rozwiązana automatycznie bo wieże się nie zmieniły
+          // Ale musimy usunąć tymczasową figurę
+          G.board[startPos.y][startPos.x] = null;
+        } else if (targetPiece && targetPiece.color !== piece.color) {
+          // Phantom - natychmiastowe zbicie (bez czasu na ucieczkę)
+          if (targetPiece.type === "queen") {
+            (targetPiece.color === "white"
+              ? G.capturedByBlack
+              : G.capturedByWhite
+            ).push(targetPiece);
+            G.board[endPos.y][endPos.x] = piece;
+            moveDesc =
+              moveDesc || piece.symbol + " zbija " + targetPiece.symbol + "!";
+          }
+          // Nexus - 1 tura na ucieczkę
+          else if (targetPiece.type === "king") {
             G.inCheck = targetPiece.color;
             G.pendingCaptures.push({
               attackerX: startPos.x,
@@ -4172,7 +4456,12 @@
               turnsLeft: 1,
               isNexusLock: true,
             });
-          } else {
+            G.board[startPos.y][startPos.x] = piece;
+            moveDesc =
+              moveDesc || piece.symbol + " blokuje " + targetPiece.symbol + "!";
+          }
+          // Inne figury - 2 tury na ucieczkę
+          else {
             G.pendingCaptures.push({
               attackerX: startPos.x,
               attackerY: startPos.y,
@@ -4184,28 +4473,34 @@
               turnsLeft: 2,
               isNexusLock: false,
             });
+            G.board[startPos.y][startPos.x] = piece;
+            moveDesc =
+              moveDesc || piece.symbol + " blokuje " + targetPiece.symbol + "!";
           }
-          G.board[startPos.y][startPos.x] = piece;
-          moveDesc =
-            moveDesc || piece.symbol + " blokuje " + targetPiece.symbol + "!";
         } else {
-          G.board[endPos.y][endPos.x] = piece;
-          moveDesc =
-            moveDesc ||
-            piece.symbol +
-              " " +
-              String.fromCharCode(97 + startPos.x) +
-              (8 - startPos.y) +
-              "→" +
-              String.fromCharCode(97 + endPos.x) +
-              (8 - endPos.y);
-          if (
-            piece.type === "pawn" &&
-            ((piece.color === "white" && endPos.y === 0) ||
-              (piece.color === "black" && endPos.y === 7))
-          ) {
-            Object.assign(piece, PIECES.QUEEN, { color: piece.color });
-            moveDesc += " (Promocja!)";
+          // Strażnik nie może się ruszać bez ataku - tylko zamraża
+          if (piece.isGuardian) {
+            // Nic nie rób - strażnik wraca na miejsce
+            G.board[startPos.y][startPos.x] = null; // Usuń tymczasowego strażnika
+          } else {
+            G.board[endPos.y][endPos.x] = piece;
+            moveDesc =
+              moveDesc ||
+              piece.symbol +
+                " " +
+                String.fromCharCode(97 + startPos.x) +
+                (8 - startPos.y) +
+                "→" +
+                String.fromCharCode(97 + endPos.x) +
+                (8 - endPos.y);
+            if (
+              piece.type === "pawn" &&
+              ((piece.color === "white" && endPos.y === 0) ||
+                (piece.color === "black" && endPos.y === 7))
+            ) {
+              Object.assign(piece, PIECES.QUEEN, { color: piece.color });
+              moveDesc += " (Promocja!)";
+            }
           }
         }
 
@@ -4298,6 +4593,24 @@
       function switchTurn() {
         G.currentPlayer = G.currentPlayer === "white" ? "black" : "white";
 
+        // Sprawdź Tarcze Sentineli
+        checkSentinelShields();
+
+        // Odliczaj zamrożenie figur aktualnego gracza
+        for (var y = 0; y < 8; y++) {
+          for (var x = 0; x < 8; x++) {
+            var p = G.board[y][x];
+            if (
+              p &&
+              p.color === G.currentPlayer &&
+              p.frozenTurns &&
+              p.frozenTurns > 0
+            ) {
+              p.frozenTurns--;
+            }
+          }
+        }
+
         // Sprawdź czy Nexus jest zablokowany i czy ma gdzie uciec
         for (var i = 0; i < G.pendingCaptures.length; i++) {
           var cap = G.pendingCaptures[i];
@@ -4348,6 +4661,8 @@
             if (piece && piece.color === color) {
               // Figura która atakuje nie może się ruszać
               if (isPieceAttacking(x, y)) continue;
+              // Zamrożona figura nie może się ruszać
+              if (piece.frozenTurns && piece.frozenTurns > 0) continue;
               if (
                 getAllMovesForPiece(x, y, piece, isPieceLocked(x, y)).length > 0
               )
