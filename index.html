@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Strzałkowe Szachy</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap");
       * {
@@ -1217,12 +1217,6 @@
         transform: rotate(180deg);
       }
       .board-wrapper.rotated .piece {
-        transform: rotate(180deg);
-      }
-      .board-wrapper.rotated .path-arrow {
-        transform: rotate(180deg);
-      }
-      .board-wrapper.rotated .lock-arrow {
         transform: rotate(180deg);
       }
       .board-wrapper.rotated .lock-timer {
@@ -2607,19 +2601,33 @@
           return;
         }
 
-        // Generuj ID dla peer
-        lobbyId =
-          "szachy-" + Math.random().toString(36).substr(2, 8).toLowerCase();
+        // Pokaż lobby od razu z info o łączeniu
         isHost = true;
-        myColor = "white"; // Host gra białymi
+        myColor = "white";
         onlinePlayers = [{ name: playerProfile, isHost: true }];
+        showScreen("lobby");
+        document.getElementById("waiting-text").textContent =
+          "Łączenie z serwerem...";
+
+        // Generuj proste ID (tylko małe litery i cyfry)
+        var randomPart = "";
+        var chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+        for (var i = 0; i < 8; i++) {
+          randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        lobbyId = "chess" + randomPart;
+
+        // Pokaż link od razu
+        updateLobbyUI();
 
         // Twórz peer jako host
-        peer = new Peer(lobbyId);
+        peer = new Peer(lobbyId, {
+          debug: 2,
+        });
 
         peer.on("open", function (id) {
           console.log("Host peer otwarty:", id);
-          showScreen("lobby");
+          lobbyId = id; // Użyj rzeczywistego ID
           updateLobbyUI();
         });
 
@@ -2638,13 +2646,29 @@
           conn.on("close", function () {
             console.log("Gość rozłączony");
             onlinePlayers = [{ name: playerProfile, isHost: true }];
-            updateLobbyUI();
+            if (!G.gameOver) updateLobbyUI();
+          });
+
+          conn.on("error", function (err) {
+            console.error("Connection error:", err);
           });
         });
 
         peer.on("error", function (err) {
           console.error("Peer error:", err);
-          alert("Błąd połączenia: " + err.type);
+          if (err.type === "unavailable-id") {
+            // ID zajęte - spróbuj z nowym
+            peer.destroy();
+            setTimeout(createLobby, 500);
+          } else {
+            document.getElementById("waiting-text").textContent =
+              "Błąd: " + err.type;
+          }
+        });
+
+        peer.on("disconnected", function () {
+          console.log("Peer disconnected, reconnecting...");
+          peer.reconnect();
         });
       }
 
@@ -2773,23 +2797,33 @@
       function joinLobby(id) {
         lobbyId = id;
         isHost = false;
-        myColor = "black"; // Gość gra czarnymi
-        onlinePlayers = [{ name: "...", isHost: true }];
+        myColor = "black";
+        onlinePlayers = [{ name: "Łączenie...", isHost: true }];
 
         showScreen("lobby");
         updateLobbyUI();
+        document.getElementById("waiting-text").textContent =
+          "Łączenie z hostem...";
 
         // Połącz się z hostem
-        peer = new Peer();
+        peer = new Peer({
+          debug: 2,
+        });
 
         peer.on("open", function (myId) {
           console.log("Moje peer ID:", myId);
+          document.getElementById("waiting-text").textContent =
+            "Nawiązywanie połączenia...";
 
           // Łącz się z hostem
-          peerConnection = peer.connect(id);
+          peerConnection = peer.connect(id, {
+            reliable: true,
+          });
 
           peerConnection.on("open", function () {
             console.log("Połączono z hostem!");
+            document.getElementById("waiting-text").textContent =
+              "Połączono! Wysyłanie danych...";
             // Wyślij swoje dane
             sendPeerData({ type: "join", name: playerProfile });
           });
@@ -2799,18 +2833,44 @@
           });
 
           peerConnection.on("close", function () {
-            alert("Host rozłączony!");
-            leaveLobby();
+            if (!G.gameOver) {
+              alert("Host rozłączony!");
+              leaveLobby();
+            }
+          });
+
+          peerConnection.on("error", function (err) {
+            console.error("Connection error:", err);
+            document.getElementById("waiting-text").textContent =
+              "Błąd połączenia!";
           });
         });
 
         peer.on("error", function (err) {
           console.error("Peer error:", err);
           if (err.type === "peer-unavailable") {
-            alert("Lobby nie istnieje lub Host jest offline.");
-            leaveLobby();
+            document.getElementById("waiting-text").textContent =
+              "Host nie znaleziony!";
+            document.getElementById("waiting-text").style.color =
+              "var(--accent-magenta)";
+            setTimeout(function () {
+              if (confirm("Nie znaleziono hosta. Spróbować ponownie?")) {
+                peer.destroy();
+                joinLobby(id);
+              } else {
+                leaveLobby();
+              }
+            }, 500);
           } else {
-            alert("Błąd połączenia: " + err.type);
+            document.getElementById("waiting-text").textContent =
+              "Błąd: " + err.type;
+          }
+        });
+
+        peer.on("disconnected", function () {
+          console.log("Peer disconnected");
+          if (!G.gameOver) {
+            peer.reconnect();
           }
         });
       }
@@ -2891,31 +2951,23 @@
           }
         }
 
-        // Wykonaj ruch
         var startPos = G.selectedPiece;
         var endPos = { x: data.endX, y: data.endY };
         var piece = G.board[startPos.y][startPos.x];
         var targetPiece = G.board[endPos.y][endPos.x];
 
-        // Animacja i wykonanie
-        var animEndX = endPos.x;
-        var animEndY = endPos.y;
+        // Atak - bez animacji
         if (targetPiece && targetPiece.color !== piece.color) {
-          if (G.plannedPath.length > 2) {
-            var beforeEnd = G.plannedPath[G.plannedPath.length - 2];
-            animEndX = beforeEnd.x;
-            animEndY = beforeEnd.y;
-          } else {
-            animEndX = startPos.x;
-            animEndY = startPos.y;
-          }
+          finishMove(startPos, endPos, piece, targetPiece, G.currentPlayer);
+          return;
         }
 
+        // Normalny ruch - z animacją
         animateMove(
           startPos.x,
           startPos.y,
-          animEndX,
-          animEndY,
+          endPos.x,
+          endPos.y,
           piece,
           function () {
             finishMove(startPos, endPos, piece, targetPiece, G.currentPlayer);
@@ -2937,6 +2989,21 @@
         var board = document.getElementById("board");
         var boardRect = board.getBoundingClientRect();
         var tileSize = boardRect.width / 8;
+        var flipped = shouldFlipBoard();
+
+        // Pozycje na ekranie - jeśli obrócone, CSS już obraca więc współrzędne są odwrócone wizualnie
+        var screenStartX = flipped ? 7 - startX : startX;
+        var screenStartY = flipped ? 7 - startY : startY;
+        var screenEndX = flipped ? 7 - endX : endX;
+        var screenEndY = flipped ? 7 - endY : endY;
+
+        // Schowaj figurę na planszy
+        var tileIndex = startY * 8 + startX;
+        var originalTile = board.querySelectorAll(".tile")[tileIndex];
+        var originalPiece = originalTile
+          ? originalTile.querySelector(".piece")
+          : null;
+        if (originalPiece) originalPiece.style.visibility = "hidden";
 
         // Tworzymy animowany element
         var movingPiece = document.createElement("div");
@@ -2949,8 +3016,9 @@
         movingPiece.style.display = "flex";
         movingPiece.style.alignItems = "center";
         movingPiece.style.justifyContent = "center";
-        movingPiece.style.left = boardRect.left + startX * tileSize + "px";
-        movingPiece.style.top = boardRect.top + startY * tileSize + "px";
+        movingPiece.style.left =
+          boardRect.left + screenStartX * tileSize + "px";
+        movingPiece.style.top = boardRect.top + screenStartY * tileSize + "px";
         movingPiece.style.transition =
           "left 0.25s ease-out, top 0.25s ease-out";
         movingPiece.style.zIndex = "1000";
@@ -2958,8 +3026,9 @@
 
         // Uruchamiamy animację
         requestAnimationFrame(function () {
-          movingPiece.style.left = boardRect.left + endX * tileSize + "px";
-          movingPiece.style.top = boardRect.top + endY * tileSize + "px";
+          movingPiece.style.left =
+            boardRect.left + screenEndX * tileSize + "px";
+          movingPiece.style.top = boardRect.top + screenEndY * tileSize + "px";
         });
 
         // Po zakończeniu animacji
@@ -3370,6 +3439,7 @@
             )
               tile.classList.add("valid-move");
 
+            // Kliknięcie - współrzędne są poprawne, CSS tylko obraca wizualnie
             (function (tx, ty) {
               tile.addEventListener("click", function () {
                 handleTileClick(tx, ty);
@@ -3457,20 +3527,30 @@
 
       function updateBoardRotation() {
         var boardWrapper = document.getElementById("board-wrapper");
-        if (
-          G.gameMode === "pvp" &&
-          window.innerWidth <= 900 &&
-          !G.gameOver &&
-          !G.analyzing
-        ) {
+        if (!boardWrapper) return;
+
+        // Online - czarny zawsze widzi obrócone
+        if (G.gameMode === "online" && myColor === "black") {
+          boardWrapper.classList.add("rotated");
+          return;
+        }
+
+        // PvP - obrót przy turze czarnych
+        if (G.gameMode === "pvp" && !G.gameOver && !G.analyzing) {
           if (G.currentPlayer === "black") {
             boardWrapper.classList.add("rotated");
           } else {
             boardWrapper.classList.remove("rotated");
           }
-        } else {
-          boardWrapper.classList.remove("rotated");
+          return;
         }
+
+        boardWrapper.classList.remove("rotated");
+      }
+
+      function shouldFlipBoard() {
+        var boardWrapper = document.getElementById("board-wrapper");
+        return boardWrapper && boardWrapper.classList.contains("rotated");
       }
 
       function updateMoveLog(text, color) {
@@ -3784,14 +3864,13 @@
 
       function executeMove() {
         if (G.plannedPath.length < 2) return;
-        if (G.analyzing) return; // Nie można grać podczas analizy
-        if (G.isAnimating) return; // Nie wykonuj podczas animacji
+        if (G.analyzing) return;
+        if (G.isAnimating) return;
 
         var startPos = G.selectedPiece;
         var endPos = G.plannedPath[G.plannedPath.length - 1];
         var piece = G.board[startPos.y][startPos.x];
         var targetPiece = G.board[endPos.y][endPos.x];
-        var moveDesc = "";
         var moveColor = G.currentPlayer;
 
         // Wyślij ruch do przeciwnika (online)
@@ -3799,40 +3878,20 @@
           sendOnlineMove(startPos, endPos, G.plannedPath);
         }
 
-        // Określ końcową pozycję dla animacji
-        var animEndX = endPos.x;
-        var animEndY = endPos.y;
-
-        // Jeśli to atak, figura kończy tuż przed celem
+        // Jeśli to atak - BEZ animacji (figura zostaje na miejscu)
         if (targetPiece && targetPiece.color !== piece.color) {
-          // Dla ataku - animacja do przedostatniego pola
-          if (G.plannedPath.length > 2) {
-            var beforeEnd = G.plannedPath[G.plannedPath.length - 2];
-            animEndX = beforeEnd.x;
-            animEndY = beforeEnd.y;
-          } else {
-            animEndX = startPos.x;
-            animEndY = startPos.y;
-          }
+          finishMove(startPos, endPos, piece, targetPiece, moveColor);
+          return;
         }
 
-        // Schowaj figurę z planszy na czas animacji
-        var originalTile = document.querySelector(
-          ".board .tile:nth-child(" +
-            (startPos.y * 8 + startPos.x + 1) +
-            ") .piece"
-        );
-        if (originalTile) originalTile.style.visibility = "hidden";
-
-        // Uruchom animację
+        // Normalny ruch - animacja do końcowej pozycji
         animateMove(
           startPos.x,
           startPos.y,
-          animEndX,
-          animEndY,
+          endPos.x,
+          endPos.y,
           piece,
           function () {
-            // Po animacji wykonaj ruch
             finishMove(startPos, endPos, piece, targetPiece, moveColor);
           }
         );
@@ -3930,8 +3989,21 @@
           var targetPiece = G.board[cap.targetY]
             ? G.board[cap.targetY][cap.targetX]
             : null;
-          if (!targetPiece) return; // uciekł
-          if (targetPiece.color === cap.attackerColor) return;
+
+          // Ofiara uciekła - atakujący wchodzi na jej pole
+          if (!targetPiece || targetPiece.color === cap.attackerColor) {
+            // Przenieś atakującego na pole gdzie była ofiara
+            G.board[cap.targetY][cap.targetX] = cap.attackerPiece;
+            if (
+              G.board[cap.attackerY] &&
+              G.board[cap.attackerY][cap.attackerX] &&
+              G.board[cap.attackerY][cap.attackerX].symbol ===
+                cap.attackerSymbol
+            ) {
+              G.board[cap.attackerY][cap.attackerX] = null;
+            }
+            return; // Nie dodawaj do newPending
+          }
 
           // Zmniejsz licznik tylko gdy to tura obrońcy
           if (targetPiece.color === G.currentPlayer) {
