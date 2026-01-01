@@ -464,6 +464,7 @@
         width: min(65vh, 500px);
         height: min(65vh, 500px);
         box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+        position: relative;
       }
       .tile {
         aspect-ratio: 1;
@@ -3770,30 +3771,22 @@
         if (analysisArrows.length === 0) return;
 
         var board = document.getElementById("board");
-        var wrapper = document.getElementById("board-wrapper");
-        var boardRect = board.getBoundingClientRect();
-        var wrapperRect = wrapper.getBoundingClientRect();
-        var tileSize = boardRect.width / 8;
+        var tiles = board.querySelectorAll(".tile");
+        if (tiles.length === 0) return;
 
-        // Offset board względem wrapper
-        var offsetX = boardRect.left - wrapperRect.left;
-        var offsetY = boardRect.top - wrapperRect.top;
-
-        // Czy plansza jest obrócona
-        var flipped = wrapper.classList.contains("rotated");
+        var tileSize = tiles[0].offsetWidth;
+        var boardSize = tileSize * 8;
 
         var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         svg.id = "analysis-arrows-svg";
         svg.style.position = "absolute";
         svg.style.top = "0";
         svg.style.left = "0";
-        svg.style.width = "100%";
-        svg.style.height = "100%";
+        svg.style.width = boardSize + "px";
+        svg.style.height = boardSize + "px";
         svg.style.pointerEvents = "none";
         svg.style.zIndex = "100";
-        if (flipped) {
-          svg.style.transform = "rotate(180deg)";
-        }
+        svg.setAttribute("viewBox", "0 0 " + boardSize + " " + boardSize);
 
         // Definicja strzałki
         var defs = document.createElementNS(
@@ -3826,11 +3819,17 @@
             "line"
           );
 
-          // Pozycje w pikselach - środek każdego pola
-          var x1 = offsetX + (arrow.fromX + 0.5) * tileSize;
-          var y1 = offsetY + (arrow.fromY + 0.5) * tileSize;
-          var x2 = offsetX + (arrow.toX + 0.5) * tileSize;
-          var y2 = offsetY + (arrow.toY + 0.5) * tileSize;
+          // Znajdź rzeczywiste pozycje kafelków
+          var fromTile = tiles[arrow.fromY * 8 + arrow.fromX];
+          var toTile = tiles[arrow.toY * 8 + arrow.toX];
+
+          if (!fromTile || !toTile) return;
+
+          // Środek każdego kafelka względem board
+          var x1 = fromTile.offsetLeft + fromTile.offsetWidth / 2;
+          var y1 = fromTile.offsetTop + fromTile.offsetHeight / 2;
+          var x2 = toTile.offsetLeft + toTile.offsetWidth / 2;
+          var y2 = toTile.offsetTop + toTile.offsetHeight / 2;
 
           line.setAttribute("x1", x1);
           line.setAttribute("y1", y1);
@@ -3844,7 +3843,8 @@
           svg.appendChild(line);
         });
 
-        wrapper.appendChild(svg);
+        // Dodaj SVG do board (nie wrapper) żeby było w tym samym kontekście obrotu
+        board.appendChild(svg);
       }
 
       function updateUI() {
@@ -4009,6 +4009,9 @@
           if (weAreLocked && targetPiece) continue;
           if (targetPiece && targetPiece.color !== piece.color && !isLastStep)
             continue;
+
+          // Nie można zbić figury która aktualnie atakuje (jest w blokadzie)
+          if (targetPiece && isPieceAttacking(newX, newY)) continue;
 
           // Sprawdź Tarczę Sentinela - nie można wejść na pola tarczy przeciwnika
           if (isBlockedByShield(newX, newY, piece.color)) continue;
@@ -4809,6 +4812,8 @@
             var stepsUsed = path.length; // path zawiera start, więc stepsUsed = ile kroków zrobiliśmy
             var isThisLastStep = stepsUsed >= piece.moves;
             if (targetPiece && targetPiece.color !== piece.color) {
+              // Nie można zbić figury która atakuje
+              if (isPieceAttacking(newX, newY)) continue;
               // Można zbić tylko w ostatnim kroku
               if (isThisLastStep) {
                 var newPath = path.slice();
