@@ -4210,7 +4210,7 @@
         return boardWrapper && boardWrapper.classList.contains("rotated");
       }
 
-      // Ocena pozycji - prosty algorytm
+      // Ocena pozycji - zaawansowany algorytm
       function evaluatePosition() {
         var pieceValues = {
           king: 0, // Król nie ma wartości materialnej
@@ -4223,6 +4223,42 @@
 
         var whiteScore = 0;
         var blackScore = 0;
+        var whiteMobility = 0;
+        var blackMobility = 0;
+
+        // Tablice pozycyjne (bonus za dobre pola)
+        var pawnTable = [
+          [0, 0, 0, 0, 0, 0, 0, 0],
+          [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+          [0.1, 0.1, 0.2, 0.3, 0.3, 0.2, 0.1, 0.1],
+          [0.05, 0.05, 0.1, 0.25, 0.25, 0.1, 0.05, 0.05],
+          [0, 0, 0, 0.2, 0.2, 0, 0, 0],
+          [0.05, -0.05, -0.1, 0, 0, -0.1, -0.05, 0.05],
+          [0.05, 0.1, 0.1, -0.2, -0.2, 0.1, 0.1, 0.05],
+          [0, 0, 0, 0, 0, 0, 0, 0],
+        ];
+
+        var knightTable = [
+          [-0.5, -0.4, -0.3, -0.3, -0.3, -0.3, -0.4, -0.5],
+          [-0.4, -0.2, 0, 0, 0, 0, -0.2, -0.4],
+          [-0.3, 0, 0.1, 0.15, 0.15, 0.1, 0, -0.3],
+          [-0.3, 0.05, 0.15, 0.2, 0.2, 0.15, 0.05, -0.3],
+          [-0.3, 0, 0.15, 0.2, 0.2, 0.15, 0, -0.3],
+          [-0.3, 0.05, 0.1, 0.15, 0.15, 0.1, 0.05, -0.3],
+          [-0.4, -0.2, 0, 0.05, 0.05, 0, -0.2, -0.4],
+          [-0.5, -0.4, -0.3, -0.3, -0.3, -0.3, -0.4, -0.5],
+        ];
+
+        var centerTable = [
+          [-0.2, -0.1, -0.1, -0.1, -0.1, -0.1, -0.1, -0.2],
+          [-0.1, 0, 0, 0, 0, 0, 0, -0.1],
+          [-0.1, 0, 0.1, 0.1, 0.1, 0.1, 0, -0.1],
+          [-0.1, 0, 0.1, 0.2, 0.2, 0.1, 0, -0.1],
+          [-0.1, 0, 0.1, 0.2, 0.2, 0.1, 0, -0.1],
+          [-0.1, 0, 0.1, 0.1, 0.1, 0.1, 0, -0.1],
+          [-0.1, 0, 0, 0, 0, 0, 0, -0.1],
+          [-0.2, -0.1, -0.1, -0.1, -0.1, -0.1, -0.1, -0.2],
+        ];
 
         for (var y = 0; y < 8; y++) {
           for (var x = 0; x < 8; x++) {
@@ -4230,21 +4266,70 @@
             if (!piece) continue;
 
             var value = pieceValues[piece.type] || 0;
+            var posBonus = 0;
 
-            // Bonus za pozycję (centrum = lepiej)
-            var centerBonus =
-              (3.5 - Math.abs(x - 3.5)) * 0.1 + (3.5 - Math.abs(y - 3.5)) * 0.1;
-
-            // Bonus za pionki bliżej promocji
+            // Bonus pozycyjny zależny od figury
             if (piece.type === "pawn") {
+              var py = piece.color === "white" ? y : 7 - y;
+              posBonus = pawnTable[py][x];
+              // Bonus za zaawansowane pionki
               if (piece.color === "white") {
-                centerBonus += (7 - y) * 0.15;
+                posBonus += (7 - y) * 0.1;
               } else {
-                centerBonus += y * 0.15;
+                posBonus += y * 0.1;
+              }
+            } else if (piece.type === "knight") {
+              var ky = piece.color === "white" ? y : 7 - y;
+              posBonus = knightTable[ky][x];
+            } else if (piece.type === "queen" || piece.type === "rook") {
+              posBonus = centerTable[y][x] * 0.5;
+            } else if (piece.type === "bishop") {
+              posBonus = centerTable[y][x] * 0.3;
+            }
+
+            value += posBonus;
+
+            // Mobilność - ile ruchów ma figura
+            if (piece.type !== "king") {
+              var moves = getAllMovesForPiece(x, y, piece, false);
+              var mobilityBonus = moves.length * 0.05;
+              if (piece.color === "white") {
+                whiteMobility += mobilityBonus;
+              } else {
+                blackMobility += mobilityBonus;
               }
             }
 
-            value += centerBonus;
+            // Bezpieczeństwo króla
+            if (piece.type === "king") {
+              var enemyColor = piece.color === "white" ? "black" : "white";
+              // Kara jeśli król jest w centrum (niebezpiecznie)
+              if (x >= 2 && x <= 5 && y >= 2 && y <= 5) {
+                value -= 0.5;
+              }
+              // Bonus za figury obronne w pobliżu
+              for (var dy = -1; dy <= 1; dy++) {
+                for (var dx = -1; dx <= 1; dx++) {
+                  var nx = x + dx,
+                    ny = y + dy;
+                  if (nx >= 0 && nx < 8 && ny >= 0 && ny < 8) {
+                    var neighbor = G.board[ny][nx];
+                    if (
+                      neighbor &&
+                      neighbor.color === piece.color &&
+                      neighbor.type !== "king"
+                    ) {
+                      value += 0.1;
+                    }
+                  }
+                }
+              }
+            }
+
+            // Zamrożona figura = mniejsza wartość
+            if (piece.frozenTurns && piece.frozenTurns > 0) {
+              value *= 0.7;
+            }
 
             if (piece.color === "white") {
               whiteScore += value;
@@ -4254,28 +4339,198 @@
           }
         }
 
+        // Dodaj mobilność
+        whiteScore += whiteMobility;
+        blackScore += blackMobility;
+
         // Sprawdź zbite figury
         G.capturedByWhite.forEach(function (p) {
-          whiteScore += pieceValues[p.type] * 0.5; // Zbite = zyskujesz połowę wartości
+          whiteScore += pieceValues[p.type];
         });
         G.capturedByBlack.forEach(function (p) {
-          blackScore += pieceValues[p.type] * 0.5;
+          blackScore += pieceValues[p.type];
         });
 
         // Sprawdź aktywne blokady
         G.pendingCaptures.forEach(function (cap) {
-          if (cap.attackerColor === "white") {
-            whiteScore += 0.5; // Bonus za atak
-          } else {
-            blackScore += 0.5;
+          var targetPiece = G.board[cap.targetY]
+            ? G.board[cap.targetY][cap.targetX]
+            : null;
+          if (targetPiece) {
+            var threatValue = pieceValues[targetPiece.type] * 0.3;
+            // Blokada z 1 turą = bardziej groźna
+            if (cap.turnsLeft === 1) threatValue *= 1.5;
+
+            if (cap.attackerColor === "white") {
+              whiteScore += threatValue;
+            } else {
+              blackScore += threatValue;
+            }
           }
         });
 
-        // Szach = duży bonus
-        if (G.inCheck === "white") blackScore += 2;
-        if (G.inCheck === "black") whiteScore += 2;
+        // Podwójny atak = ogromny bonus
+        var attackCounts = {};
+        G.pendingCaptures.forEach(function (cap) {
+          var key = cap.targetX + "," + cap.targetY;
+          if (!attackCounts[key]) attackCounts[key] = { white: 0, black: 0 };
+          attackCounts[key][cap.attackerColor]++;
+        });
+        for (var key in attackCounts) {
+          if (attackCounts[key].white >= 2) whiteScore += 3;
+          if (attackCounts[key].black >= 2) blackScore += 3;
+        }
+
+        // Szach = bonus
+        if (G.inCheck === "white") blackScore += 1.5;
+        if (G.inCheck === "black") whiteScore += 1.5;
+
+        // Tarcza Sentinela = bonus
+        G.sentinelShields.forEach(function (shield) {
+          if (shield.color === "white") {
+            whiteScore += 0.8 + shield.tiles.length * 0.1;
+          } else {
+            blackScore += 0.8 + shield.tiles.length * 0.1;
+          }
+        });
+
+        // ===== OCENA BLISKOŚCI MATA =====
+        var whiteMateScore = evaluateMateProximity("white");
+        var blackMateScore = evaluateMateProximity("black");
+
+        // Dodaj do wyniku (ujemny = bliżej bycia zamatowanym)
+        whiteScore += blackMateScore; // Jeśli czarny blisko mata = bonus dla białego
+        blackScore += whiteMateScore; // Jeśli biały blisko mata = bonus dla czarnego
 
         return whiteScore - blackScore;
+      }
+
+      // Ocena jak blisko dany kolor jest do bycia zamatowanym
+      // Zwraca wartość dodatnią = przeciwnik blisko mata (dobrze dla nas)
+      function evaluateMateProximity(kingColor) {
+        var score = 0;
+        var enemyColor = kingColor === "white" ? "black" : "white";
+
+        // Znajdź króla
+        var kingPos = null;
+        for (var y = 0; y < 8; y++) {
+          for (var x = 0; x < 8; x++) {
+            var p = G.board[y][x];
+            if (p && p.type === "king" && p.color === kingColor) {
+              kingPos = { x: x, y: y };
+              break;
+            }
+          }
+          if (kingPos) break;
+        }
+
+        if (!kingPos) return 0;
+
+        // 1. Czy król jest pod szachem?
+        var isInCheck = G.inCheck === kingColor;
+        if (isInCheck) score += 3;
+
+        // 2. Ile pól ucieczki ma król?
+        var kingPiece = G.board[kingPos.y][kingPos.x];
+        var escapeMoves = getAllMovesForPiece(
+          kingPos.x,
+          kingPos.y,
+          kingPiece,
+          false
+        );
+
+        // Filtruj bezpieczne pola
+        var safeEscapes = 0;
+        for (var i = 0; i < escapeMoves.length; i++) {
+          var path = escapeMoves[i];
+          if (path.length > 1) {
+            var endPos = path[path.length - 1];
+            if (!isSquareThreatened(endPos.x, endPos.y, enemyColor)) {
+              safeEscapes++;
+            }
+          }
+        }
+
+        // Mało bezpiecznych pól = bliżej mata
+        if (safeEscapes === 0 && isInCheck) {
+          score += 50; // Prawie mat!
+        } else if (safeEscapes === 0) {
+          score += 8; // Król zablokowany ale nie szach
+        } else if (safeEscapes === 1) {
+          score += 4; // Tylko jedno pole ucieczki
+        } else if (safeEscapes === 2) {
+          score += 2;
+        }
+
+        // 3. Czy król jest w rogu/na krawędzi? (łatwiej zamatować)
+        if (
+          (kingPos.x === 0 || kingPos.x === 7) &&
+          (kingPos.y === 0 || kingPos.y === 7)
+        ) {
+          score += 1.5; // Róg
+        } else if (
+          kingPos.x === 0 ||
+          kingPos.x === 7 ||
+          kingPos.y === 0 ||
+          kingPos.y === 7
+        ) {
+          score += 0.8; // Krawędź
+        }
+
+        // 4. Ile wrogich figur atakuje pola wokół króla?
+        var threatsAroundKing = 0;
+        for (var dy = -1; dy <= 1; dy++) {
+          for (var dx = -1; dx <= 1; dx++) {
+            var nx = kingPos.x + dx,
+              ny = kingPos.y + dy;
+            if (nx >= 0 && nx < 8 && ny >= 0 && ny < 8) {
+              if (isSquareThreatened(nx, ny, enemyColor)) {
+                threatsAroundKing++;
+              }
+            }
+          }
+        }
+        score += threatsAroundKing * 0.3;
+
+        // 5. Czy jest aktywna blokada na królu?
+        for (var i = 0; i < G.pendingCaptures.length; i++) {
+          var cap = G.pendingCaptures[i];
+          if (
+            cap.targetX === kingPos.x &&
+            cap.targetY === kingPos.y &&
+            cap.isNexusLock
+          ) {
+            if (cap.turnsLeft === 1) {
+              score += 15; // Ostatnia szansa na ucieczkę!
+            } else {
+              score += 8;
+            }
+          }
+        }
+
+        // 6. Stosunek materiału - jeśli przeciwnik ma dużo figur a my mało, bliżej mata
+        var ourMaterial = 0,
+          theirMaterial = 0;
+        var pieceVals = { queen: 9, rook: 5, bishop: 3, knight: 3, pawn: 1 };
+        for (var y = 0; y < 8; y++) {
+          for (var x = 0; x < 8; x++) {
+            var p = G.board[y][x];
+            if (p && p.type !== "king") {
+              if (p.color === kingColor) {
+                ourMaterial += pieceVals[p.type] || 0;
+              } else {
+                theirMaterial += pieceVals[p.type] || 0;
+              }
+            }
+          }
+        }
+
+        // Duża przewaga materialna przeciwnika = bliżej mata
+        var materialDiff = theirMaterial - ourMaterial;
+        if (materialDiff > 10) score += 3;
+        else if (materialDiff > 5) score += 1.5;
+
+        return score;
       }
 
       function updateEvalBar() {
@@ -4301,10 +4556,59 @@
       }
 
       // Ocena jakości ruchu
-      function getMoveIcon(evalChange, capturedPiece, causedCheck) {
-        // Szach na króla = świetny ruch
+      function getMoveIcon(evalChange, capturedPiece, causedCheck, moveInfo) {
+        // moveInfo = { piece, toX, toY } - opcjonalne dodatkowe info
+
+        // Sprawdź czy ruch prowadzi do mata lub blisko mata
+        var currentEval = evaluatePosition();
+        var absEval = Math.abs(currentEval);
+
+        // Jeśli eval bardzo wysoki/niski = blisko mata
+        if (absEval > 30) {
+          // Ktoś jest bliski mata
+          if (
+            (currentEval > 0 && evalChange > 0) ||
+            (currentEval < 0 && evalChange < 0)
+          ) {
+            return "brilliant"; // Ruch przybliżający do mata
+          }
+        }
+
+        // BLUNDER: Podstawienie pod podwójny atak
+        if (moveInfo && !capturedPiece) {
+          var attacksOnSquare = countAttacksOnSquare(
+            moveInfo.toX,
+            moveInfo.toY,
+            moveInfo.piece.color === "white" ? "black" : "white"
+          );
+          if (attacksOnSquare >= 2) {
+            return "blunder"; // Natychmiastowa strata figury!
+          }
+        }
+
+        // BLUNDER: Phantom podstawiony pod bicie (nie może uciec)
+        if (moveInfo && moveInfo.piece.type === "queen" && !capturedPiece) {
+          var enemyColor = moveInfo.piece.color === "white" ? "black" : "white";
+          if (isSquareThreatened(moveInfo.toX, moveInfo.toY, enemyColor)) {
+            return "blunder"; // Phantom zginie!
+          }
+        }
+
+        // Szach na króla
         if (causedCheck) {
-          return evalChange >= 3 ? "brilliant" : "great";
+          // Sprawdź ile pól ucieczki ma król
+          var enemyColor = G.currentPlayer; // Po ruchu tura się zmieniła
+          var mateProximity = evaluateMateProximity(enemyColor);
+
+          if (mateProximity > 40) return "brilliant"; // Prawie mat!
+          if (mateProximity > 15) return "brilliant";
+          if (mateProximity > 5) return "great";
+          return evalChange >= 2 ? "great" : "good";
+        }
+
+        // Zbicie Phantoma = natychmiastowe, bardzo dobre
+        if (capturedPiece && capturedPiece.type === "queen") {
+          return "brilliant";
         }
 
         // Zbicie cennej figury
@@ -4317,18 +4621,19 @@
             pawn: 1,
           };
           var captureValue = pieceValues[capturedPiece.type] || 0;
-          if (captureValue >= 5) return evalChange >= 2 ? "brilliant" : "great";
-          if (captureValue >= 3) return "great";
+          if (captureValue >= 5) return evalChange >= 1 ? "brilliant" : "great";
+          if (captureValue >= 3) return evalChange >= 0 ? "great" : "good";
         }
 
-        // Na podstawie zmiany eval
+        // Duża zmiana eval = ważny ruch
+        if (evalChange >= 8) return "brilliant"; // Ogromna poprawa
         if (evalChange >= 4) return "brilliant"; // !!
         if (evalChange >= 2) return "great"; // !
         if (evalChange >= 0.5) return "good"; // ✓
         if (evalChange >= -0.5) return "book"; // neutralny
         if (evalChange >= -2) return "inaccuracy"; // ?!
-        if (evalChange >= -4) return "mistake"; // ?
-        return "blunder"; // ??
+        if (evalChange >= -5) return "mistake"; // ?
+        return "blunder"; // ?? (stracił dużo)
       }
 
       function updateMoveLog(text, color) {
@@ -4908,7 +5213,11 @@
           endX: endPos.x,
           endY: endPos.y,
           color: moveColor,
-          icon: getMoveIcon(evalChange, targetPiece, G.inCheck),
+          icon: getMoveIcon(evalChange, targetPiece, G.inCheck, {
+            piece: piece,
+            toX: endPos.x,
+            toY: endPos.y,
+          }),
         };
 
         // Zapisz stan przed processPendingCaptures
@@ -5126,8 +5435,19 @@
           }
           return;
         }
-        if (G.gameMode === "bot" && G.currentPlayer === "black" && !G.gameOver)
-          setTimeout(makeBotMove, 800);
+        if (
+          G.gameMode === "bot" &&
+          G.currentPlayer === "black" &&
+          !G.gameOver
+        ) {
+          var delay =
+            G.difficulty === "easy"
+              ? 1000
+              : G.difficulty === "hard"
+              ? 2500
+              : 1500;
+          setTimeout(makeBotMove, delay);
+        }
       }
 
       function hasLegalMoves(color) {
@@ -5334,7 +5654,11 @@
       function makeBotMove() {
         if (G.gameOver) return;
 
-        // Sprawdź czy Nexus jest zagrożony
+        // Czas namysłu zależny od trudności
+        var thinkTime =
+          G.difficulty === "easy" ? 800 : G.difficulty === "hard" ? 2500 : 1500;
+
+        // Sprawdź czy Nexus jest zagrożony - PRIORYTET
         for (var i = 0; i < G.pendingCaptures.length; i++) {
           var cap = G.pendingCaptures[i];
           if (cap.isNexusLock) {
@@ -5349,9 +5673,14 @@
                 true
               );
               if (nexusMoves.length > 0) {
+                // Wybierz najbezpieczniejsze pole
+                var bestMove = selectSafestMove(
+                  nexusMoves,
+                  cap.targetX,
+                  cap.targetY
+                );
                 G.selectedPiece = { x: cap.targetX, y: cap.targetY };
-                G.plannedPath =
-                  nexusMoves[Math.floor(Math.random() * nexusMoves.length)];
+                G.plannedPath = bestMove;
                 executeMove();
                 return;
               }
@@ -5374,9 +5703,13 @@
                 true
               );
               if (escapeMoves.length > 0) {
+                var bestMove = selectSafestMove(
+                  escapeMoves,
+                  cap.targetX,
+                  cap.targetY
+                );
                 G.selectedPiece = { x: cap.targetX, y: cap.targetY };
-                G.plannedPath =
-                  escapeMoves[Math.floor(Math.random() * escapeMoves.length)];
+                G.plannedPath = bestMove;
                 executeMove();
                 return;
               }
@@ -5400,7 +5733,6 @@
               isGuardian: true,
               shieldIndex: s,
             };
-            // Tymczasowo postaw strażnika
             var gx = shield.guardianX,
               gy = shield.guardianY;
             if (!G.board[gy][gx]) {
@@ -5418,18 +5750,15 @@
                 if (path.length > 1) {
                   var endPos = path[path.length - 1];
                   var target = G.board[endPos.y][endPos.x];
-                  // Strażnik może tylko atakować (zamrażać)
                   if (target && target.color === "white") {
-                    var score = 100; // Wysoki priorytet dla zamrożenia
-                    var vals = {
-                      king: 200,
-                      queen: 90,
-                      rook: 50,
-                      bishop: 35,
-                      knight: 30,
-                      pawn: 10,
-                    };
-                    score += vals[target.type] || 10;
+                    var score = evaluateMoveDeep(
+                      gx,
+                      gy,
+                      endPos.x,
+                      endPos.y,
+                      guardianPiece,
+                      target
+                    );
                     allMoves.push({
                       from: { x: gx, y: gy, isGuardian: true, shieldIndex: s },
                       path: path,
@@ -5448,9 +5777,7 @@
           for (var x = 0; x < 8; x++) {
             var piece = G.board[y][x];
             if (piece && piece.color === "black") {
-              // Nie ruszaj figurą która atakuje
               if (isPieceAttacking(x, y)) continue;
-              // Nie ruszaj zamrożoną figurą
               if (piece.frozenTurns && piece.frozenTurns > 0) continue;
 
               var moves = getAllMovesForPiece(x, y, piece, isPieceLocked(x, y));
@@ -5459,28 +5786,14 @@
                 if (path.length > 1) {
                   var endPos = path[path.length - 1];
                   var target = G.board[endPos.y][endPos.x];
-                  var score = Math.random() * 5;
-                  if (target && target.color === "white") {
-                    var vals = {
-                      king: 1000,
-                      queen: 90,
-                      rook: 50,
-                      bishop: 35,
-                      knight: 30,
-                      pawn: 10,
-                    };
-                    score += vals[target.type] || 10;
-                  }
-                  score +=
-                    (7 - Math.abs(endPos.x - 3.5) - Math.abs(endPos.y - 3.5)) *
-                    2;
-                  if (piece.type === "pawn") score += endPos.y * 3;
-
-                  // Bonus za tworzenie tarczy (wieże w linii)
-                  if (piece.type === "rook") {
-                    score += getBotShieldBonus(x, y, endPos.x, endPos.y);
-                  }
-
+                  var score = evaluateMoveDeep(
+                    x,
+                    y,
+                    endPos.x,
+                    endPos.y,
+                    piece,
+                    target
+                  );
                   allMoves.push({
                     from: { x: x, y: y },
                     path: path,
@@ -5492,22 +5805,35 @@
             }
           }
         }
+
         if (allMoves.length === 0) return;
+
+        // Sortuj i wybierz ruch zależnie od trudności
         allMoves.sort(function (a, b) {
           return b.score - a.score;
         });
-        var poolSize =
-          G.difficulty === "easy"
-            ? Math.max(1, Math.floor(allMoves.length / 2))
-            : G.difficulty === "hard"
-            ? 3
-            : 5;
-        var pool = allMoves.slice(0, Math.min(poolSize, allMoves.length));
-        var selectedMove = pool[Math.floor(Math.random() * pool.length)];
+
+        var selectedMove;
+        if (G.difficulty === "hard") {
+          // Na trudnym - zawsze najlepszy ruch lub jeden z top 2
+          selectedMove =
+            allMoves[Math.floor(Math.random() * Math.min(2, allMoves.length))];
+        } else if (G.difficulty === "easy") {
+          // Na łatwym - losowy z górnej połowy
+          var poolSize = Math.max(3, Math.floor(allMoves.length / 2));
+          selectedMove =
+            allMoves[
+              Math.floor(Math.random() * Math.min(poolSize, allMoves.length))
+            ];
+        } else {
+          // Średni - top 5
+          selectedMove =
+            allMoves[Math.floor(Math.random() * Math.min(5, allMoves.length))];
+        }
+
         G.selectedPiece = selectedMove.from;
         G.plannedPath = selectedMove.path;
 
-        // Jeśli to strażnik, postaw go tymczasowo
         if (selectedMove.from.isGuardian) {
           G.board[selectedMove.from.y][selectedMove.from.x] =
             selectedMove.piece;
@@ -5525,6 +5851,346 @@
           }
         }
         executeMove();
+      }
+
+      // Wybierz najbezpieczniejszy ruch ucieczki
+      function selectSafestMove(moves, fromX, fromY) {
+        var bestMove = moves[0];
+        var bestSafety = -Infinity;
+
+        for (var i = 0; i < moves.length; i++) {
+          var path = moves[i];
+          var endPos = path[path.length - 1];
+          var safety = 0;
+
+          // Czy pole jest zagrożone?
+          if (!isSquareThreatened(endPos.x, endPos.y, "white")) {
+            safety += 100;
+          }
+
+          // Odległość od centrum (centrum = bezpieczniej dla króla? nie zawsze)
+          safety += (3.5 - Math.abs(endPos.x - 3.5)) * 2;
+
+          // Czy jest blisko własnych figur (ochrona)?
+          for (var dy = -1; dy <= 1; dy++) {
+            for (var dx = -1; dx <= 1; dx++) {
+              var nx = endPos.x + dx,
+                ny = endPos.y + dy;
+              if (nx >= 0 && nx < 8 && ny >= 0 && ny < 8) {
+                var p = G.board[ny][nx];
+                if (p && p.color === "black" && p.type !== "king") {
+                  safety += 5;
+                }
+              }
+            }
+          }
+
+          if (safety > bestSafety) {
+            bestSafety = safety;
+            bestMove = path;
+          }
+        }
+        return bestMove;
+      }
+
+      // Głęboka ocena ruchu
+      function evaluateMoveDeep(fromX, fromY, toX, toY, piece, targetPiece) {
+        var score = 0;
+        var pieceValues = {
+          king: 10000,
+          queen: 900,
+          rook: 500,
+          bishop: 320,
+          knight: 300,
+          pawn: 100,
+          guardian: 400,
+        };
+
+        // 1. Wartość zbicia
+        if (targetPiece) {
+          score += pieceValues[targetPiece.type] || 100;
+          // Bonus za zbicie Phantoma (nie może uciec)
+          if (targetPiece.type === "queen") score += 200;
+          // Ogromny bonus za atak na króla
+          if (targetPiece.type === "king") score += 5000;
+        }
+
+        // 2. Symuluj ruch i oceń pozycję
+        var originalTarget = G.board[toY][toX];
+        var originalFrom = G.board[fromY][fromX];
+        G.board[toY][toX] = piece;
+        G.board[fromY][fromX] = null;
+
+        var positionScore = evaluatePositionDeep("black");
+
+        // Przywróć
+        G.board[fromY][fromX] = originalFrom;
+        G.board[toY][toX] = originalTarget;
+
+        score += positionScore * 0.5;
+
+        // 3. Kontrola centrum
+        var centerDist = Math.abs(toX - 3.5) + Math.abs(toY - 3.5);
+        score += (7 - centerDist) * 15;
+
+        // 4. Bezpieczeństwo figury po ruchu
+        if (isSquareThreatened(toX, toY, "white")) {
+          score -= pieceValues[piece.type] * 0.3; // Kara za wejście na zagrożone pole
+        }
+
+        // 5. Rozwój figur (wyprowadzanie z pierwszej linii)
+        if (fromY === 7 && toY < 7) {
+          score += 20; // Bonus za rozwój
+        }
+
+        // 6. Pionki - bonus za awans
+        if (piece.type === "pawn") {
+          score += toY * 25; // Im bliżej promocji tym lepiej
+          if (toY >= 5) score += 50; // Dodatkowy bonus za zaawansowane pionki
+        }
+
+        // 7. Tworzenie tarczy (wieże)
+        if (piece.type === "rook") {
+          score += getBotShieldBonus(fromX, fromY, toX, toY) * 2;
+        }
+
+        // 8. Atakowanie wielu figur naraz
+        var attackCount = countThreatenedEnemies(toX, toY, piece);
+        score += attackCount * 30;
+
+        // 9. Ochrona własnego króla
+        var kingPos = findKing("black");
+        if (kingPos) {
+          var distToKing =
+            Math.abs(toX - kingPos.x) + Math.abs(toY - kingPos.y);
+          if (distToKing <= 2) score += 25; // Bonus za bycie blisko króla
+        }
+
+        // 10. KARA za podstawienie pod podwójny atak (natychmiastowe zbicie!)
+        if (!targetPiece) {
+          // Tylko jeśli to nie jest zbicie
+          var attacksOnSquare = countAttacksOnSquare(toX, toY, "white");
+          if (attacksOnSquare >= 2) {
+            // Podwójny atak = natychmiastowa strata figury!
+            score -= pieceValues[piece.type] * 2;
+          } else if (
+            attacksOnSquare === 1 &&
+            isSquareThreatened(toX, toY, "white")
+          ) {
+            // Pojedynczy atak - figura może uciec, ale i tak kara
+            score -= pieceValues[piece.type] * 0.3;
+          }
+        }
+
+        // 11. OGROMNA KARA za podstawienie Phantoma pod bicie
+        if (piece.type === "queen" && isSquareThreatened(toX, toY, "white")) {
+          // Phantom nie może uciec! To prawie pewna strata
+          score -= pieceValues[piece.type] * 1.5;
+        }
+
+        // 12. Kara za zostawienie ważnej figury bez obrony
+        // Sprawdź czy po ruchu jakaś nasza figura zostaje bez obrony pod atakiem
+        var originalTarget = G.board[toY][toX];
+        var originalFrom = G.board[fromY][fromX];
+        G.board[toY][toX] = piece;
+        G.board[fromY][fromX] = null;
+
+        for (var cy = 0; cy < 8; cy++) {
+          for (var cx = 0; cx < 8; cx++) {
+            var checkPiece = G.board[cy][cx];
+            if (
+              checkPiece &&
+              checkPiece.color === "black" &&
+              checkPiece.type !== "king"
+            ) {
+              if (isSquareThreatened(cx, cy, "white")) {
+                // Czy ta figura jest broniona?
+                var defended = isSquareDefended(cx, cy, "black");
+                if (!defended) {
+                  score -= pieceValues[checkPiece.type] * 0.5;
+                }
+              }
+            }
+          }
+        }
+
+        // Przywróć
+        G.board[fromY][fromX] = originalFrom;
+        G.board[toY][toX] = originalTarget;
+
+        // 13. Losowość dla trudności
+        if (G.difficulty === "easy") {
+          score += Math.random() * 100;
+        } else if (G.difficulty === "medium") {
+          score += Math.random() * 30;
+        } else {
+          score += Math.random() * 10;
+        }
+
+        return score;
+      }
+
+      // Policz ile ataków jest na dane pole
+      function countAttacksOnSquare(x, y, byColor) {
+        var count = 0;
+
+        // Sprawdź pending captures
+        for (var i = 0; i < G.pendingCaptures.length; i++) {
+          var cap = G.pendingCaptures[i];
+          if (
+            cap.targetX === x &&
+            cap.targetY === y &&
+            cap.attackerColor === byColor
+          ) {
+            count++;
+          }
+        }
+
+        // Sprawdź czy figury mogą zaatakować to pole
+        for (var py = 0; py < 8; py++) {
+          for (var px = 0; px < 8; px++) {
+            var p = G.board[py][px];
+            if (p && p.color === byColor) {
+              var moves = getAllMovesForPiece(px, py, p, false);
+              for (var m = 0; m < moves.length; m++) {
+                var path = moves[m];
+                if (path.length > 1) {
+                  var endPos = path[path.length - 1];
+                  if (endPos.x === x && endPos.y === y) {
+                    count++;
+                    break; // Jedna figura = jeden atak
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        return count;
+      }
+
+      // Czy pole jest bronione przez dany kolor
+      function isSquareDefended(x, y, byColor) {
+        for (var py = 0; py < 8; py++) {
+          for (var px = 0; px < 8; px++) {
+            var p = G.board[py][px];
+            if (p && p.color === byColor && !(px === x && py === y)) {
+              // Sprawdź czy ta figura może "zbić" na tym polu (czyli bronić)
+              var moves = getAllMovesForPiece(px, py, p, false);
+              for (var m = 0; m < moves.length; m++) {
+                var path = moves[m];
+                if (path.length > 1) {
+                  var endPos = path[path.length - 1];
+                  if (endPos.x === x && endPos.y === y) {
+                    return true;
+                  }
+                }
+              }
+            }
+          }
+        }
+        return false;
+      }
+
+      // Znajdź króla
+      function findKing(color) {
+        for (var y = 0; y < 8; y++) {
+          for (var x = 0; x < 8; x++) {
+            var p = G.board[y][x];
+            if (p && p.type === "king" && p.color === color) {
+              return { x: x, y: y };
+            }
+          }
+        }
+        return null;
+      }
+
+      // Policz ile wrogich figur zagrożonych z danego pola
+      function countThreatenedEnemies(x, y, piece) {
+        var count = 0;
+        var directions = [];
+
+        if (piece.straightOnly) {
+          directions = ["n", "s", "e", "w"];
+        } else if (piece.diagonalOnly) {
+          directions = ["ne", "nw", "se", "sw"];
+        } else {
+          directions = ["n", "s", "e", "w", "ne", "nw", "se", "sw"];
+        }
+
+        directions.forEach(function (key) {
+          var dir = DIRECTIONS[key];
+          for (var step = 1; step <= piece.moves; step++) {
+            var nx = x + dir.dx * step;
+            var ny = y + dir.dy * step;
+            if (nx < 0 || nx > 7 || ny < 0 || ny > 7) break;
+            var target = G.board[ny][nx];
+            if (target) {
+              if (target.color === "white") count++;
+              break;
+            }
+          }
+        });
+
+        return count;
+      }
+
+      // Głęboka ocena pozycji
+      function evaluatePositionDeep(forColor) {
+        var pieceValues = {
+          king: 10000,
+          queen: 900,
+          rook: 500,
+          bishop: 320,
+          knight: 300,
+          pawn: 100,
+        };
+        var score = 0;
+
+        for (var y = 0; y < 8; y++) {
+          for (var x = 0; x < 8; x++) {
+            var piece = G.board[y][x];
+            if (!piece) continue;
+
+            var value = pieceValues[piece.type] || 0;
+
+            // Pozycja - centrum lepsze
+            var centerBonus =
+              (3.5 - Math.abs(x - 3.5)) * 5 + (3.5 - Math.abs(y - 3.5)) * 5;
+            value += centerBonus;
+
+            // Pionki - awans
+            if (piece.type === "pawn") {
+              if (piece.color === "white") {
+                value += (7 - y) * 15;
+              } else {
+                value += y * 15;
+              }
+            }
+
+            // Mobilność - ile ruchów ma figura
+            var moves = getAllMovesForPiece(x, y, piece, false);
+            value += moves.length * 3;
+
+            // Bezpieczeństwo
+            var enemyColor = piece.color === "white" ? "black" : "white";
+            if (isSquareThreatened(x, y, enemyColor)) {
+              value -= pieceValues[piece.type] * 0.1;
+            }
+
+            if (piece.color === forColor) {
+              score += value;
+            } else {
+              score -= value;
+            }
+          }
+        }
+
+        // Sprawdź szachy
+        if (G.inCheck === "white" && forColor === "black") score += 200;
+        if (G.inCheck === "black" && forColor === "white") score += 200;
+
+        return score;
       }
 
       // Bonus dla bota za ustawianie wież w linii (tworzenie tarczy)
