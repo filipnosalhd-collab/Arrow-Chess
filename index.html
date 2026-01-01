@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Strzałkowe Szachy</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap");
       * {
@@ -2545,6 +2546,9 @@
       let lobbyId = null;
       let isHost = false;
       let onlinePlayers = [];
+      let peer = null;
+      let peerConnection = null;
+      let myColor = null; // 'white' lub 'black'
 
       // Inicjalizacja profilu
       function initProfile() {
@@ -2573,7 +2577,15 @@
         playerProfile = name;
         localStorage.setItem("arrowChessProfile", name);
         initProfile();
-        showScreen("menu");
+
+        // Jeśli czekało lobby do dołączenia
+        if (window.pendingLobby) {
+          var lobbyToJoin = window.pendingLobby;
+          window.pendingLobby = null;
+          joinLobby(lobbyToJoin);
+        } else {
+          showScreen("menu");
+        }
       }
 
       function showScreen(screenId) {
@@ -2588,21 +2600,52 @@
         if (navBtn) navBtn.classList.add("active");
       }
 
-      // Online / Lobby
+      // Online / Lobby z PeerJS
       function createLobby() {
         if (!playerProfile) {
           showProfileScreen();
           return;
         }
-        lobbyId = generateLobbyId();
-        isHost = true;
-        onlinePlayers = [{ name: playerProfile, isHost: true }];
-        showScreen("lobby");
-        updateLobbyUI();
-      }
 
-      function generateLobbyId() {
-        return "LOBBY-" + Math.random().toString(36).substr(2, 8).toUpperCase();
+        // Generuj ID dla peer
+        lobbyId =
+          "szachy-" + Math.random().toString(36).substr(2, 8).toLowerCase();
+        isHost = true;
+        myColor = "white"; // Host gra białymi
+        onlinePlayers = [{ name: playerProfile, isHost: true }];
+
+        // Twórz peer jako host
+        peer = new Peer(lobbyId);
+
+        peer.on("open", function (id) {
+          console.log("Host peer otwarty:", id);
+          showScreen("lobby");
+          updateLobbyUI();
+        });
+
+        peer.on("connection", function (conn) {
+          console.log("Ktoś się łączy!");
+          peerConnection = conn;
+
+          conn.on("open", function () {
+            console.log("Połączenie otwarte");
+          });
+
+          conn.on("data", function (data) {
+            handlePeerData(data);
+          });
+
+          conn.on("close", function () {
+            console.log("Gość rozłączony");
+            onlinePlayers = [{ name: playerProfile, isHost: true }];
+            updateLobbyUI();
+          });
+        });
+
+        peer.on("error", function (err) {
+          console.error("Peer error:", err);
+          alert("Błąd połączenia: " + err.type);
+        });
       }
 
       function updateLobbyUI() {
@@ -2615,19 +2658,27 @@
         linkEl.textContent = fullUrl;
         linkEl.href = fullUrl;
 
+        // Pokaż czy jesteś hostem czy gościem
+        var lobbyTitle = document.querySelector(".lobby-box h2");
+        if (isHost) {
+          lobbyTitle.textContent = "🌐 Twoje Lobby (Host - Białe)";
+        } else {
+          lobbyTitle.textContent = "🌐 Dołączono (Gość - Czarne)";
+        }
+
         var player1 = document.getElementById("player1-slot");
         var player1Name = document.getElementById("player1-name");
         player1Name.textContent = onlinePlayers[0]
-          ? onlinePlayers[0].name
+          ? onlinePlayers[0].name + " ⚪"
           : "Oczekiwanie...";
         player1.classList.toggle("empty", !onlinePlayers[0]);
 
         var player2 = document.getElementById("player2-slot");
         var player2Name = player2.querySelector(".player-name");
         if (onlinePlayers[1]) {
-          player2Name.textContent = onlinePlayers[1].name;
+          player2Name.textContent = onlinePlayers[1].name + " ⚫";
           player2.classList.remove("empty");
-          player2.querySelector(".player-status").textContent = "✓ Gotowy";
+          player2.querySelector(".player-status").textContent = "✓ Połączony";
         } else {
           player2Name.textContent = "Oczekiwanie...";
           player2.classList.add("empty");
@@ -2639,14 +2690,27 @@
 
         var startBtn = document.getElementById("start-online-btn");
         var waitingText = document.getElementById("waiting-text");
-        if (onlinePlayers.length >= 2) {
-          startBtn.disabled = false;
-          waitingText.textContent = "Gotowi do gry!";
-          waitingText.style.color = "var(--accent-cyan)";
+
+        if (!isHost) {
+          startBtn.style.display = "none";
+          if (onlinePlayers.length >= 2) {
+            waitingText.textContent = "Czekam aż Host rozpocznie grę...";
+            waitingText.style.color = "var(--accent-cyan)";
+          } else {
+            waitingText.textContent = "Łączenie z Hostem...";
+            waitingText.style.color = "var(--accent-gold)";
+          }
         } else {
-          startBtn.disabled = true;
-          waitingText.textContent = "Czekam na drugiego gracza...";
-          waitingText.style.color = "var(--accent-gold)";
+          startBtn.style.display = "inline-block";
+          if (onlinePlayers.length >= 2) {
+            startBtn.disabled = false;
+            waitingText.textContent = "Gotowi do gry!";
+            waitingText.style.color = "var(--accent-cyan)";
+          } else {
+            startBtn.disabled = true;
+            waitingText.textContent = "Czekam na drugiego gracza...";
+            waitingText.style.color = "var(--accent-gold)";
+          }
         }
       }
 
@@ -2662,16 +2726,30 @@
       }
 
       function leaveLobby() {
+        if (peer) {
+          peer.destroy();
+          peer = null;
+        }
+        if (peerConnection) {
+          peerConnection.close();
+          peerConnection = null;
+        }
         lobbyId = null;
         isHost = false;
         onlinePlayers = [];
+        myColor = null;
+        G.gameMode = null;
         showScreen("menu");
       }
 
       function startOnlineGame() {
-        // W przyszłości: synchronizacja przez WebSocket/Firebase
-        // Na razie: symulacja - po prostu startujemy grę PvP
-        G.gameMode = "pvp";
+        if (!isHost || onlinePlayers.length < 2) return;
+
+        // Wyślij info o starcie do gościa
+        sendPeerData({ type: "start", timeLimit: 5, increment: 2 });
+
+        // Startuj grę lokalnie
+        G.gameMode = "online";
         G.timeLimit = 5;
         G.increment = 2;
         resetGame();
@@ -2685,7 +2763,6 @@
         if (lobbyParam) {
           if (!playerProfile) {
             showProfileScreen();
-            // Po zapisaniu profilu dołącz do lobby
             window.pendingLobby = lobbyParam;
           } else {
             joinLobby(lobbyParam);
@@ -2696,13 +2773,162 @@
       function joinLobby(id) {
         lobbyId = id;
         isHost = false;
-        // Symulacja - w prawdziwej wersji połączenie przez WebSocket
-        onlinePlayers = [
-          { name: "Host", isHost: true },
-          { name: playerProfile, isHost: false },
-        ];
+        myColor = "black"; // Gość gra czarnymi
+        onlinePlayers = [{ name: "...", isHost: true }];
+
         showScreen("lobby");
         updateLobbyUI();
+
+        // Połącz się z hostem
+        peer = new Peer();
+
+        peer.on("open", function (myId) {
+          console.log("Moje peer ID:", myId);
+
+          // Łącz się z hostem
+          peerConnection = peer.connect(id);
+
+          peerConnection.on("open", function () {
+            console.log("Połączono z hostem!");
+            // Wyślij swoje dane
+            sendPeerData({ type: "join", name: playerProfile });
+          });
+
+          peerConnection.on("data", function (data) {
+            handlePeerData(data);
+          });
+
+          peerConnection.on("close", function () {
+            alert("Host rozłączony!");
+            leaveLobby();
+          });
+        });
+
+        peer.on("error", function (err) {
+          console.error("Peer error:", err);
+          if (err.type === "peer-unavailable") {
+            alert("Lobby nie istnieje lub Host jest offline.");
+            leaveLobby();
+          } else {
+            alert("Błąd połączenia: " + err.type);
+          }
+        });
+      }
+
+      function sendPeerData(data) {
+        if (peerConnection && peerConnection.open) {
+          peerConnection.send(data);
+        }
+      }
+
+      function handlePeerData(data) {
+        console.log("Otrzymano dane:", data);
+
+        switch (data.type) {
+          case "join":
+            // Gość dołączył (tylko host otrzymuje)
+            onlinePlayers = [
+              { name: playerProfile, isHost: true },
+              { name: data.name, isHost: false },
+            ];
+            updateLobbyUI();
+            // Potwierdź dołączenie
+            sendPeerData({ type: "joined", hostName: playerProfile });
+            break;
+
+          case "joined":
+            // Potwierdzenie od hosta (tylko gość otrzymuje)
+            onlinePlayers = [
+              { name: data.hostName, isHost: true },
+              { name: playerProfile, isHost: false },
+            ];
+            updateLobbyUI();
+            break;
+
+          case "start":
+            // Host rozpoczął grę
+            G.gameMode = "online";
+            G.timeLimit = data.timeLimit;
+            G.increment = data.increment;
+            resetGame();
+            showScreen("game");
+            break;
+
+          case "move":
+            // Przeciwnik wykonał ruch
+            receiveOnlineMove(data);
+            break;
+        }
+      }
+
+      function sendOnlineMove(startPos, endPos, path) {
+        sendPeerData({
+          type: "move",
+          startX: startPos.x,
+          startY: startPos.y,
+          endX: endPos.x,
+          endY: endPos.y,
+          path: path,
+        });
+      }
+
+      function receiveOnlineMove(data) {
+        // Odtwórz ruch przeciwnika
+        G.selectedPiece = { x: data.startX, y: data.startY };
+        G.plannedPath = data.path;
+
+        // Sprawdź czy użyto skosu
+        G.usedDiagonal = false;
+        for (var i = 1; i < data.path.length; i++) {
+          var prev = data.path[i - 1],
+            curr = data.path[i];
+          if (
+            Math.abs(curr.x - prev.x) === 1 &&
+            Math.abs(curr.y - prev.y) === 1
+          ) {
+            G.usedDiagonal = true;
+            break;
+          }
+        }
+
+        // Wykonaj ruch
+        var startPos = G.selectedPiece;
+        var endPos = { x: data.endX, y: data.endY };
+        var piece = G.board[startPos.y][startPos.x];
+        var targetPiece = G.board[endPos.y][endPos.x];
+
+        // Animacja i wykonanie
+        var animEndX = endPos.x;
+        var animEndY = endPos.y;
+        if (targetPiece && targetPiece.color !== piece.color) {
+          if (G.plannedPath.length > 2) {
+            var beforeEnd = G.plannedPath[G.plannedPath.length - 2];
+            animEndX = beforeEnd.x;
+            animEndY = beforeEnd.y;
+          } else {
+            animEndX = startPos.x;
+            animEndY = startPos.y;
+          }
+        }
+
+        animateMove(
+          startPos.x,
+          startPos.y,
+          animEndX,
+          animEndY,
+          piece,
+          function () {
+            finishMove(startPos, endPos, piece, targetPiece, G.currentPlayer);
+          }
+        );
+      }
+
+      function canMakeMove() {
+        // W trybie online - możesz ruszyć tylko swoje figury
+        if (G.gameMode === "online") {
+          return G.currentPlayer === myColor;
+        }
+        return true;
       }
 
       // Animacja ruchu figury
@@ -3341,6 +3567,9 @@
       }
 
       function handleNormalMove(x, y) {
+        // W trybie online sprawdź czy to twoja tura
+        if (!canMakeMove()) return;
+
         var piece = G.board[y][x];
         var validMoves = getValidNextSteps();
 
@@ -3564,6 +3793,11 @@
         var targetPiece = G.board[endPos.y][endPos.x];
         var moveDesc = "";
         var moveColor = G.currentPlayer;
+
+        // Wyślij ruch do przeciwnika (online)
+        if (G.gameMode === "online" && peerConnection) {
+          sendOnlineMove(startPos, endPos, G.plannedPath);
+        }
 
         // Określ końcową pozycję dla animacji
         var animEndX = endPos.x;
