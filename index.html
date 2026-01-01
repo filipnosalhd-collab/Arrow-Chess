@@ -821,6 +821,21 @@
         border-radius: 3px;
         z-index: 5;
       }
+      /* Figura pod atakiem - pulsowanie na żółto */
+      .piece.under-attack {
+        animation: attackPulse 1s infinite ease-in-out;
+      }
+      @keyframes attackPulse {
+        0%,
+        100% {
+          background: rgba(255, 200, 0, 0.3);
+          box-shadow: 0 0 10px rgba(255, 200, 0, 0.5);
+        }
+        50% {
+          background: rgba(255, 200, 0, 0.7);
+          box-shadow: 0 0 25px rgba(255, 200, 0, 0.9);
+        }
+      }
       /* Online / Profil */
       .profile-bar {
         position: absolute;
@@ -850,14 +865,70 @@
       .no-profile:hover {
         background: rgba(255, 0, 170, 0.2);
       }
+      .elo-display {
+        font-family: "Orbitron", monospace;
+        font-size: 0.85rem;
+        color: var(--accent-gold);
+        padding: 5px 12px;
+        background: var(--bg-medium);
+        border: 1px solid var(--accent-gold);
+      }
+      .elo-toast {
+        position: fixed;
+        top: 60px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 10px 20px;
+        font-family: "Orbitron", monospace;
+        font-size: 0.9rem;
+        z-index: 1002;
+        display: none;
+        border-radius: 5px;
+        animation: eloToastIn 0.3s ease;
+      }
+      .elo-toast.active {
+        display: block;
+      }
+      .elo-toast.positive {
+        background: rgba(0, 180, 100, 0.9);
+        color: white;
+        border: 2px solid #00ff88;
+      }
+      .elo-toast.negative {
+        background: rgba(180, 0, 50, 0.9);
+        color: white;
+        border: 2px solid #ff4466;
+      }
+      @keyframes eloToastIn {
+        from {
+          opacity: 0;
+          transform: translateX(-50%) translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
+      }
       @media (max-width: 900px) {
         .profile-bar {
           top: 30px;
           left: 5px;
+          flex-direction: column;
+          gap: 5px;
+          align-items: flex-start;
         }
         .profile-name {
           font-size: 0.6rem;
           padding: 3px 8px;
+        }
+        .elo-display {
+          font-size: 0.6rem;
+          padding: 3px 8px;
+        }
+        .elo-toast {
+          top: 80px;
+          font-size: 0.75rem;
+          padding: 8px 15px;
         }
       }
       /* Ekran profilu */
@@ -1073,6 +1144,153 @@
         color: var(--text-secondary);
         padding: 4px 0;
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      /* Przyciski online (remis, poddanie) */
+      .online-actions {
+        margin-top: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .draw-btn,
+      .resign-btn {
+        padding: 10px 15px;
+        font-family: "Orbitron", monospace;
+        font-size: 0.75rem;
+        cursor: pointer;
+        border: none;
+      }
+      .draw-btn {
+        background: var(--accent-gold);
+        color: var(--bg-dark);
+      }
+      .draw-btn:hover {
+        box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+      }
+      .draw-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .resign-btn {
+        background: var(--accent-magenta);
+        color: white;
+      }
+      .resign-btn:hover {
+        box-shadow: 0 0 15px rgba(255, 0, 170, 0.5);
+      }
+      /* Modal propozycji remisu */
+      .draw-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+      }
+      .draw-modal.active {
+        display: flex;
+      }
+      .draw-modal-content {
+        background: var(--bg-medium);
+        border: 2px solid var(--accent-gold);
+        padding: 30px;
+        text-align: center;
+        max-width: 350px;
+        animation: modalPop 0.3s ease;
+      }
+      @keyframes modalPop {
+        from {
+          transform: scale(0.8);
+          opacity: 0;
+        }
+        to {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      .draw-modal-text {
+        font-family: "Orbitron", monospace;
+        font-size: 1.1rem;
+        color: var(--accent-gold);
+        margin-bottom: 20px;
+      }
+      .draw-modal-buttons {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        margin-bottom: 15px;
+      }
+      .draw-accept {
+        padding: 12px 25px;
+        background: var(--accent-cyan);
+        border: none;
+        color: var(--bg-dark);
+        font-family: "Orbitron", monospace;
+        font-size: 0.9rem;
+        cursor: pointer;
+      }
+      .draw-accept:hover {
+        box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+      }
+      .draw-decline {
+        padding: 12px 25px;
+        background: var(--accent-magenta);
+        border: none;
+        color: white;
+        font-family: "Orbitron", monospace;
+        font-size: 0.9rem;
+        cursor: pointer;
+      }
+      .draw-decline:hover {
+        box-shadow: 0 0 20px rgba(255, 0, 170, 0.5);
+      }
+      .draw-modal-hint {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+      }
+      /* Toast z odpowiedzią */
+      .draw-toast {
+        position: fixed;
+        top: 20%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--bg-medium);
+        border: 2px solid var(--accent-cyan);
+        padding: 15px 30px;
+        font-family: "Orbitron", monospace;
+        font-size: 1rem;
+        z-index: 1001;
+        display: none;
+        animation: toastIn 0.3s ease;
+      }
+      .draw-toast.active {
+        display: block;
+      }
+      .draw-toast.accepted {
+        border-color: var(--accent-cyan);
+        color: var(--accent-cyan);
+      }
+      .draw-toast.declined {
+        border-color: var(--accent-magenta);
+        color: var(--accent-magenta);
+      }
+      .draw-toast.sent {
+        border-color: var(--accent-gold);
+        color: var(--accent-gold);
+      }
+      @keyframes toastIn {
+        from {
+          opacity: 0;
+          transform: translateX(-50%) translateY(-20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
       }
       .legend {
         margin-top: 12px;
@@ -1674,7 +1892,11 @@
         >
           ⚙ Ustaw profil
         </div>
+        <div class="elo-display" id="elo-display">⭐ 0 ELO</div>
       </div>
+
+      <!-- Toast zmiany ELO -->
+      <div class="elo-toast" id="elo-toast"></div>
       <header>
         <h1>Strzałkowe Szachy</h1>
         <p class="subtitle">Strategia • Planowanie • Taktyka</p>
@@ -1879,7 +2101,36 @@
               <div class="pending-title">⚠️ Aktywne Blokady</div>
               <div id="pending-list"></div>
             </div>
+            <div
+              class="online-actions"
+              id="online-actions"
+              style="display: none"
+            >
+              <button class="draw-btn" id="btn-offer-draw">
+                🤝 Zaproponuj remis
+              </button>
+              <button class="resign-btn" id="btn-resign">🏳️ Poddaj się</button>
+            </div>
           </div>
+
+          <!-- Modal propozycji remisu -->
+          <div class="draw-modal" id="draw-modal">
+            <div class="draw-modal-content">
+              <div class="draw-modal-text" id="draw-modal-text">
+                Przeciwnik proponuje remis
+              </div>
+              <div class="draw-modal-buttons">
+                <button class="draw-accept" id="draw-accept">✓ Akceptuj</button>
+                <button class="draw-decline" id="draw-decline">✗ Odrzuć</button>
+              </div>
+              <div class="draw-modal-hint">
+                Wykonanie ruchu automatycznie odrzuca propozycję
+              </div>
+            </div>
+          </div>
+
+          <!-- Toast z odpowiedzią -->
+          <div class="draw-toast" id="draw-toast"></div>
           <div class="game-board-container">
             <div class="timer-display black-timer" id="black-timer">
               <span class="timer-label">CZARNE</span>
@@ -3007,6 +3258,7 @@
 
       // Profil i Online
       let playerProfile = localStorage.getItem("arrowChessProfile") || null;
+      let playerElo = parseInt(localStorage.getItem("arrowChessElo")) || 0;
       let lobbyId = null;
       let isHost = false;
       let onlinePlayers = [];
@@ -3026,6 +3278,57 @@
           display.textContent = "⚙ Ustaw profil";
           display.classList.add("no-profile");
         }
+        updateEloDisplay();
+      }
+
+      function updateEloDisplay() {
+        var eloDisplay = document.getElementById("elo-display");
+        if (eloDisplay) {
+          eloDisplay.textContent = "⭐ " + playerElo + " ELO";
+        }
+      }
+
+      function addElo(amount, reason) {
+        playerElo += amount;
+        if (playerElo < 0) playerElo = 0;
+        localStorage.setItem("arrowChessElo", playerElo);
+        updateEloDisplay();
+
+        // Pokaż zmianę ELO
+        showEloChange(amount, reason);
+      }
+
+      function showEloChange(amount, reason) {
+        var toast = document.getElementById("elo-toast");
+        if (!toast) return;
+
+        var sign = amount >= 0 ? "+" : "";
+        toast.textContent =
+          sign + amount + " ELO" + (reason ? " (" + reason + ")" : "");
+        toast.className =
+          "elo-toast active " + (amount >= 0 ? "positive" : "negative");
+
+        setTimeout(function () {
+          toast.classList.remove("active");
+        }, 2000);
+      }
+
+      // Oblicz ELO za ruch na podstawie ikony
+      function calculateEloForMove(moveIcon, causedCheck, causedMate) {
+        if (causedMate) return 75; // Mat = duży bonus
+        if (causedCheck) return 20; // Szach
+
+        var eloChanges = {
+          brilliant: 30,
+          great: 20,
+          good: 12,
+          book: 0,
+          inaccuracy: -8,
+          mistake: -18,
+          blunder: -30,
+        };
+
+        return eloChanges[moveIcon] || 0;
       }
 
       function showProfileScreen() {
@@ -3418,10 +3721,145 @@
             // Przeciwnik wykonał ruch
             receiveOnlineMove(data);
             break;
+
+          case "draw_offer":
+            // Przeciwnik proponuje remis
+            showDrawOffer(data.playerName);
+            break;
+
+          case "draw_response":
+            // Odpowiedź na propozycję remisu
+            handleDrawResponse(data.accepted, data.playerName);
+            break;
+
+          case "resign":
+            // Przeciwnik się poddał
+            handleOpponentResign(data.playerName);
+            break;
         }
       }
 
-      function sendOnlineMove(startPos, endPos, path) {
+      // System remisu
+      var pendingDrawOffer = false; // Czy czekamy na odpowiedź
+      var receivedDrawOffer = false; // Czy otrzymaliśmy propozycję
+
+      function showDrawOffer(fromPlayer) {
+        receivedDrawOffer = true;
+        var modal = document.getElementById("draw-modal");
+        var text = document.getElementById("draw-modal-text");
+        text.textContent = fromPlayer + " proponuje remis";
+        modal.classList.add("active");
+      }
+
+      function acceptDraw() {
+        receivedDrawOffer = false;
+        document.getElementById("draw-modal").classList.remove("active");
+
+        // Wyślij akceptację
+        sendPeerData({
+          type: "draw_response",
+          accepted: true,
+          playerName: playerProfile,
+        });
+
+        // Zakończ grę remisem
+        endGameDraw();
+      }
+
+      function declineDraw() {
+        receivedDrawOffer = false;
+        document.getElementById("draw-modal").classList.remove("active");
+
+        // Wyślij odrzucenie
+        sendPeerData({
+          type: "draw_response",
+          accepted: false,
+          playerName: playerProfile,
+        });
+
+        // Pokaż toast u nas
+        showDrawToast("Odrzuciłeś remis", "declined");
+      }
+
+      function offerDraw() {
+        if (pendingDrawOffer || G.gameOver) return;
+
+        pendingDrawOffer = true;
+        document.getElementById("btn-offer-draw").disabled = true;
+
+        // Wyślij propozycję
+        sendPeerData({ type: "draw_offer", playerName: playerProfile });
+
+        // Pokaż toast
+        showDrawToast("Propozycja remisu wysłana...", "sent");
+      }
+
+      function handleDrawResponse(accepted, fromPlayer) {
+        pendingDrawOffer = false;
+        document.getElementById("btn-offer-draw").disabled = false;
+
+        if (accepted) {
+          showDrawToast(fromPlayer + " zaakceptował remis!", "accepted");
+          setTimeout(endGameDraw, 1500);
+        } else {
+          showDrawToast(fromPlayer + " odrzucił remis", "declined");
+        }
+      }
+
+      function showDrawToast(message, type) {
+        var toast = document.getElementById("draw-toast");
+        toast.textContent = message;
+        toast.className = "draw-toast active " + type;
+
+        setTimeout(function () {
+          toast.classList.remove("active");
+        }, 2500);
+      }
+
+      function endGameDraw() {
+        G.gameOver = true;
+        if (G.timerInterval) clearInterval(G.timerInterval);
+
+        document.getElementById("modal-title").textContent = "REMIS!";
+        document.getElementById("modal-message").textContent =
+          "Gracze zgodzili się na remis";
+        document.getElementById("game-over-modal").classList.add("active");
+      }
+
+      function resignGame() {
+        if (G.gameOver) return;
+
+        if (confirm("Czy na pewno chcesz się poddać?")) {
+          // Wyślij info o poddaniu
+          sendPeerData({ type: "resign", playerName: playerProfile });
+
+          // Zakończ grę - przegrywamy
+          var winner = myColor === "white" ? "black" : "white";
+          endGame(winner, "poddanie");
+        }
+      }
+
+      function handleOpponentResign(playerName) {
+        showDrawToast(playerName + " poddał się!", "accepted");
+        setTimeout(function () {
+          endGame(myColor, "poddanie");
+        }, 1000);
+      }
+
+      // Automatyczne odrzucenie remisu przy ruchu
+      function autoDeclineDrawOnMove() {
+        if (receivedDrawOffer) {
+          receivedDrawOffer = false;
+          document.getElementById("draw-modal").classList.remove("active");
+          sendPeerData({
+            type: "draw_response",
+            accepted: false,
+            playerName: playerProfile,
+          });
+        }
+      }
+
+      function sendOnlineMove(startPos, endPos, path, isGuardian) {
         sendPeerData({
           type: "move",
           startX: startPos.x,
@@ -3429,6 +3867,7 @@
           endX: endPos.x,
           endY: endPos.y,
           path: path,
+          isGuardian: isGuardian || false,
         });
       }
 
@@ -3455,6 +3894,34 @@
         var endPos = { x: data.endX, y: data.endY };
         var piece = G.board[startPos.y][startPos.x];
         var targetPiece = G.board[endPos.y][endPos.x];
+
+        // Jeśli to ruch Strażnika (isGuardian w danych)
+        if (data.isGuardian) {
+          // Znajdź tarczę i stwórz strażnika
+          for (var s = 0; s < G.sentinelShields.length; s++) {
+            var shield = G.sentinelShields[s];
+            if (
+              shield.guardianX === data.startX &&
+              shield.guardianY === data.startY &&
+              shield.color !== myColor
+            ) {
+              piece = {
+                symbol: SENTINEL_GUARDIAN.symbol,
+                name: SENTINEL_GUARDIAN.name,
+                moves: SENTINEL_GUARDIAN.moves,
+                type: "guardian",
+                straightOnly: true,
+                color: shield.color,
+                isGuardian: true,
+                shieldIndex: s,
+              };
+              G.board[startPos.y][startPos.x] = piece;
+              break;
+            }
+          }
+        }
+
+        if (!piece) return; // Brak figury
 
         // Atak - bez animacji
         if (targetPiece && targetPiece.color !== piece.color) {
@@ -3583,6 +4050,18 @@
         });
         document.getElementById("move-log").innerHTML = "";
         document.getElementById("analysis-controls").style.display = "none";
+
+        // Pokaż/ukryj przyciski online
+        var onlineActions = document.getElementById("online-actions");
+        if (G.gameMode === "online") {
+          onlineActions.style.display = "flex";
+          pendingDrawOffer = false;
+          receivedDrawOffer = false;
+          document.getElementById("btn-offer-draw").disabled = false;
+        } else {
+          onlineActions.style.display = "none";
+        }
+
         saveGameState("Start gry", null);
         updateTimerDisplay();
         if (G.timeLimit > 0) startTimer();
@@ -3924,6 +4403,10 @@
               pieceEl.className = "piece " + piece.color;
               if (isPieceAttacking(x, y)) {
                 pieceEl.classList.add("attacking");
+              }
+              // Sprawdź czy figura jest atakowana (w pendingCaptures)
+              if (isPieceLocked(x, y)) {
+                pieceEl.classList.add("under-attack");
               }
               if (piece.frozenTurns && piece.frozenTurns > 0) {
                 pieceEl.classList.add("frozen");
@@ -4574,16 +5057,10 @@
           }
         }
 
-        // BLUNDER: Podstawienie pod podwójny atak
-        if (moveInfo && !capturedPiece) {
-          var attacksOnSquare = countAttacksOnSquare(
-            moveInfo.toX,
-            moveInfo.toY,
-            moveInfo.piece.color === "white" ? "black" : "white"
-          );
-          if (attacksOnSquare >= 2) {
-            return "blunder"; // Natychmiastowa strata figury!
-          }
+        // BLUNDER: Gracz ruszył inną figurą zamiast uciec figurą pod podwójnym atakiem
+        // To sprawdzamy po fakcie - jeśli eval spadł drastycznie bo figura została zbita
+        if (evalChange <= -8) {
+          return "blunder"; // Prawdopodobnie stracił figurę przez podwójny atak
         }
 
         // BLUNDER: Phantom podstawiony pod bicie (nie może uciec)
@@ -5056,6 +5533,11 @@
         if (G.analyzing) return;
         if (G.isAnimating) return;
 
+        // Automatycznie odrzuć propozycję remisu przy ruchu
+        if (G.gameMode === "online") {
+          autoDeclineDrawOnMove();
+        }
+
         // Zapisz eval przed ruchem
         G.evalBefore = evaluatePosition();
 
@@ -5067,7 +5549,7 @@
 
         // Wyślij ruch do przeciwnika (online)
         if (G.gameMode === "online" && peerConnection) {
-          sendOnlineMove(startPos, endPos, G.plannedPath);
+          sendOnlineMove(startPos, endPos, G.plannedPath, piece.isGuardian);
         }
 
         // Jeśli to atak - BEZ animacji (figura zostaje na miejscu)
@@ -5209,16 +5691,36 @@
             : G.evalBefore - evalAfter;
 
         // Zapisz ostatni ruch z oceną
+        var moveIcon = getMoveIcon(evalChange, targetPiece, G.inCheck, {
+          piece: piece,
+          toX: endPos.x,
+          toY: endPos.y,
+        });
         G.lastMove = {
           endX: endPos.x,
           endY: endPos.y,
           color: moveColor,
-          icon: getMoveIcon(evalChange, targetPiece, G.inCheck, {
-            piece: piece,
-            toX: endPos.x,
-            toY: endPos.y,
-          }),
+          icon: moveIcon,
         };
+
+        // Dodaj/odejmij ELO za ruch gracza (tylko w grze z botem lub online)
+        var isPlayerMove = false;
+        if (G.gameMode === "bot" && moveColor === "white") {
+          isPlayerMove = true;
+        } else if (G.gameMode === "online" && moveColor === myColor) {
+          isPlayerMove = true;
+        }
+
+        if (isPlayerMove) {
+          var eloChange = calculateEloForMove(
+            moveIcon,
+            G.inCheck === (moveColor === "white" ? "black" : "white"),
+            false
+          );
+          if (eloChange !== 0) {
+            addElo(eloChange, moveIcon);
+          }
+        }
 
         // Zapisz stan przed processPendingCaptures
         saveGameState(moveDesc, moveColor);
@@ -5634,12 +6136,50 @@
         if (G.timerInterval) clearInterval(G.timerInterval);
         updateTimerDisplay();
 
+        // ELO za wynik gry
+        var playerWon = false;
+        var playerLost = false;
+
+        if (G.gameMode === "bot") {
+          playerWon = winner === "white";
+          playerLost = winner === "black";
+        } else if (G.gameMode === "online") {
+          playerWon = winner === myColor;
+          playerLost = winner !== myColor && type !== "pat";
+        }
+
+        if (playerWon) {
+          var winBonus = type === "mat" ? 100 : 60; // Mat daje więcej
+          if (G.gameMode === "bot") {
+            // Mat dzieli się zależnie od trudności bota
+            if (G.difficulty === "easy") winBonus = Math.floor(winBonus / 3);
+            else if (G.difficulty === "medium")
+              winBonus = Math.floor(winBonus / 2);
+            // Hard = pełna nagroda
+          }
+          // Online = pełna nagroda (bez dzielenia)
+          addElo(winBonus, type === "mat" ? "Mat!" : "Wygrana!");
+        } else if (playerLost) {
+          var lossPenalty = -30; // Bazowa kara
+          if (G.gameMode === "bot") {
+            // Łatwy bot = większa kara (wstyd przegrać z łatwym!)
+            if (G.difficulty === "easy") lossPenalty = -50;
+            else if (G.difficulty === "medium") lossPenalty = -30;
+            else if (G.difficulty === "hard") lossPenalty = -15; // Trudny = mniejsza kara
+          }
+          // Online = standardowa kara
+          addElo(lossPenalty, "Przegrana");
+        }
+
         var title, message;
         if (type === "mat") {
           title = "SZACH MAT!";
           message = (winner === "white" ? "Białe" : "Czarne") + " wygrywają!";
         } else if (type === "czas") {
           title = "KONIEC CZASU!";
+          message = (winner === "white" ? "Białe" : "Czarne") + " wygrywają!";
+        } else if (type === "poddanie") {
+          title = "PODDANIE!";
           message = (winner === "white" ? "Białe" : "Czarne") + " wygrywają!";
         } else {
           title = "PAT!";
@@ -6391,6 +6931,21 @@
         .addEventListener("click", function () {
           resetWhatIfMode();
         });
+
+      // Przyciski remisu/poddania
+      document
+        .getElementById("btn-offer-draw")
+        .addEventListener("click", offerDraw);
+      document
+        .getElementById("btn-resign")
+        .addEventListener("click", resignGame);
+      document
+        .getElementById("draw-accept")
+        .addEventListener("click", acceptDraw);
+      document
+        .getElementById("draw-decline")
+        .addEventListener("click", declineDraw);
+
       function startGame() {
         document.querySelectorAll(".nav-btn").forEach(function (b) {
           b.classList.remove("active");
