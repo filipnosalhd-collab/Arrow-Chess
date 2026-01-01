@@ -22,16 +22,17 @@
         --text-primary: #e8e8f0;
         --text-secondary: #8888aa;
         --white-piece: #e0e8ff;
-        --tile-light: #2a2a3a;
-        --tile-dark: #1a1a28;
+        --black-piece: #1a1a1a;
+        --tile-light: #e8e0d0;
+        --tile-dark: #ff00aa;
         --highlight: rgba(0, 212, 255, 0.4);
         --threat: rgba(255, 0, 100, 0.4);
         --valid-move: rgba(0, 255, 100, 0.3);
-        --zone-center: rgba(255, 215, 0, 0.18);
-        --zone-nexus-white: rgba(0, 150, 255, 0.15);
-        --zone-phantom-white: rgba(0, 255, 150, 0.15);
-        --zone-nexus-black: rgba(255, 100, 100, 0.15);
-        --zone-phantom-black: rgba(255, 150, 0, 0.15);
+        --zone-center: rgba(255, 215, 0, 0.35);
+        --zone-nexus-white: rgba(0, 150, 255, 0.3);
+        --zone-phantom-white: rgba(0, 255, 150, 0.3);
+        --zone-nexus-black: rgba(255, 100, 100, 0.3);
+        --zone-phantom-black: rgba(255, 150, 0, 0.3);
       }
       html,
       body {
@@ -272,6 +273,68 @@
       .inc-btn.selected {
         background: var(--accent-cyan);
         color: var(--bg-dark);
+      }
+      /* Wybór motywu planszy */
+      .board-theme-select {
+        margin-top: 25px;
+        text-align: center;
+      }
+      .board-theme-select h3 {
+        font-family: "Orbitron", monospace;
+        font-size: 1rem;
+        color: var(--accent-gold);
+        margin-bottom: 15px;
+      }
+      .theme-btns {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .theme-btn {
+        padding: 8px;
+        background: var(--bg-light);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+        min-width: 70px;
+      }
+      .theme-btn:hover {
+        border-color: var(--accent-cyan);
+        transform: scale(1.05);
+      }
+      .theme-btn.selected {
+        border-color: var(--accent-gold);
+        box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+      }
+      .theme-btn span {
+        font-family: "Rajdhani", sans-serif;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+      }
+      .theme-preview {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        width: 40px;
+        height: 40px;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .theme-tile {
+        width: 20px;
+        height: 20px;
+      }
+      .theme-tile.light {
+        grid-row: 1;
+        grid-column: 1;
+      }
+      .theme-tile.dark {
+        grid-row: 1;
+        grid-column: 2;
       }
       .timer-display {
         display: flex;
@@ -688,11 +751,12 @@
       }
       .piece.white {
         color: var(--white-piece);
-        text-shadow: 0 2px 12px rgba(224, 232, 255, 0.6);
+        text-shadow: 0 2px 12px rgba(224, 232, 255, 0.6), 0 0 2px #000;
       }
       .piece.black {
-        color: var(--accent-magenta);
-        text-shadow: 0 2px 12px rgba(255, 0, 170, 0.6);
+        color: var(--black-piece);
+        text-shadow: 0 0 8px rgba(0, 0, 0, 0.8), 0 2px 4px rgba(0, 0, 0, 0.5),
+          0 0 15px rgba(100, 100, 100, 0.3);
       }
       .piece-symbol {
         font-size: 2rem;
@@ -715,8 +779,8 @@
         text-shadow: 0 2px 15px rgba(224, 232, 255, 0.8);
       }
       .moving-piece.black {
-        color: var(--accent-magenta);
-        text-shadow: 0 2px 15px rgba(255, 0, 170, 0.8);
+        color: var(--black-piece);
+        text-shadow: 0 0 10px rgba(0, 0, 0, 0.8), 0 2px 4px rgba(0, 0, 0, 0.5);
       }
       .path-arrow {
         position: absolute;
@@ -879,6 +943,40 @@
         50% {
           background: rgba(0, 255, 100, 0.8);
           box-shadow: 0 0 30px rgba(0, 255, 100, 1);
+        }
+      }
+      /* Król pod szachem - czerwony błysk */
+      .piece.in-check {
+        animation: checkFlash 0.8s infinite ease-in-out;
+      }
+      @keyframes checkFlash {
+        0%,
+        100% {
+          background: rgba(255, 50, 50, 0.4);
+          box-shadow: 0 0 20px rgba(255, 0, 0, 0.6),
+            inset 0 0 15px rgba(255, 0, 0, 0.3);
+        }
+        50% {
+          background: rgba(255, 0, 0, 0.7);
+          box-shadow: 0 0 40px rgba(255, 0, 0, 1),
+            inset 0 0 25px rgba(255, 0, 0, 0.5);
+        }
+      }
+      /* Król zamatowany - złoty błysk */
+      .piece.in-mate {
+        animation: mateFlash 0.6s infinite ease-in-out;
+      }
+      @keyframes mateFlash {
+        0%,
+        100% {
+          background: rgba(255, 215, 0, 0.5);
+          box-shadow: 0 0 25px rgba(255, 200, 0, 0.7),
+            inset 0 0 20px rgba(255, 180, 0, 0.4);
+        }
+        50% {
+          background: rgba(255, 200, 0, 0.9);
+          box-shadow: 0 0 50px rgba(255, 180, 0, 1),
+            inset 0 0 30px rgba(255, 150, 0, 0.6);
         }
       }
       /* Online / Profil */
@@ -2141,6 +2239,73 @@
             </div>
           </div>
         </div>
+
+        <!-- Wybór kolorów planszy -->
+        <div class="board-theme-select">
+          <h3>🎨 Styl Planszy</h3>
+          <div class="theme-btns">
+            <button
+              class="theme-btn selected"
+              data-theme="classic"
+              title="Klasyczna"
+            >
+              <div class="theme-preview">
+                <div class="theme-tile light" style="background: #e8e0d0"></div>
+                <div class="theme-tile dark" style="background: #ff00aa"></div>
+              </div>
+              <span>Klasyczna</span>
+            </button>
+            <button class="theme-btn" data-theme="wood" title="Drewno">
+              <div class="theme-preview">
+                <div class="theme-tile light" style="background: #deb887"></div>
+                <div class="theme-tile dark" style="background: #8b4513"></div>
+              </div>
+              <span>Drewno</span>
+            </button>
+            <button class="theme-btn" data-theme="ocean" title="Ocean">
+              <div class="theme-preview">
+                <div class="theme-tile light" style="background: #e0f0ff"></div>
+                <div class="theme-tile dark" style="background: #1e90ff"></div>
+              </div>
+              <span>Ocean</span>
+            </button>
+            <button class="theme-btn" data-theme="forest" title="Las">
+              <div class="theme-preview">
+                <div class="theme-tile light" style="background: #e8f5e0"></div>
+                <div class="theme-tile dark" style="background: #228b22"></div>
+              </div>
+              <span>Las</span>
+            </button>
+            <button class="theme-btn" data-theme="midnight" title="Północ">
+              <div class="theme-preview">
+                <div class="theme-tile light" style="background: #4a4a6a"></div>
+                <div class="theme-tile dark" style="background: #1a1a2e"></div>
+              </div>
+              <span>Północ</span>
+            </button>
+            <button class="theme-btn" data-theme="candy" title="Cukierki">
+              <div class="theme-preview">
+                <div class="theme-tile light" style="background: #ffe4f0"></div>
+                <div class="theme-tile dark" style="background: #ff69b4"></div>
+              </div>
+              <span>Cukierki</span>
+            </button>
+            <button class="theme-btn" data-theme="neon" title="Neon">
+              <div class="theme-preview">
+                <div class="theme-tile light" style="background: #1a1a2e"></div>
+                <div class="theme-tile dark" style="background: #00ffff"></div>
+              </div>
+              <span>Neon</span>
+            </button>
+            <button class="theme-btn" data-theme="gold" title="Złoto">
+              <div class="theme-preview">
+                <div class="theme-tile light" style="background: #fff8dc"></div>
+                <div class="theme-tile dark" style="background: #ffd700"></div>
+              </div>
+              <span>Złoto</span>
+            </button>
+          </div>
+        </div>
       </div>
       <div class="screen" id="game-screen">
         <div class="game-layout">
@@ -3308,6 +3473,66 @@
         doubleAttackPieces: [],
         piecePositionHistory: {},
       };
+
+      // ===== SYSTEM MOTYWÓW PLANSZY =====
+      var boardThemes = {
+        classic: { light: "#e8e0d0", dark: "#ff00aa", name: "Klasyczna" },
+        wood: { light: "#deb887", dark: "#8b4513", name: "Drewno" },
+        ocean: { light: "#e0f0ff", dark: "#1e90ff", name: "Ocean" },
+        forest: { light: "#e8f5e0", dark: "#228b22", name: "Las" },
+        midnight: { light: "#4a4a6a", dark: "#1a1a2e", name: "Północ" },
+        candy: { light: "#ffe4f0", dark: "#ff69b4", name: "Cukierki" },
+        neon: { light: "#1a1a2e", dark: "#00ffff", name: "Neon" },
+        gold: { light: "#fff8dc", dark: "#ffd700", name: "Złoto" },
+      };
+      var currentTheme = localStorage.getItem("boardTheme") || "classic";
+
+      function applyBoardTheme(themeName, skipRender) {
+        var theme = boardThemes[themeName] || boardThemes.classic;
+        currentTheme = themeName;
+        localStorage.setItem("boardTheme", themeName);
+
+        // Ustaw CSS variables
+        document.documentElement.style.setProperty("--tile-light", theme.light);
+        document.documentElement.style.setProperty("--tile-dark", theme.dark);
+
+        // Sprawdź czy ciemne pola są bardzo ciemne (czarne/granatowe)
+        // Jeśli tak - czarne figury muszą być różowe żeby było je widać
+        var darkColor = theme.dark;
+        var blackPieceColor = "#1a1a1a"; // Domyślnie czarne figury
+
+        // Lista ciemnych kolorów gdzie czarne figury byłyby niewidoczne
+        var darkTiles = [
+          "#000000",
+          "#1a1a2e",
+          "#1a1a1a",
+          "#1a1a28",
+          "#0a0a0f",
+          "#111111",
+          "#222222",
+        ];
+        var isDarkBoard = darkTiles.some(function (c) {
+          return darkColor.toLowerCase() === c.toLowerCase();
+        });
+
+        if (isDarkBoard) {
+          blackPieceColor = "#ff00aa"; // Różowe figury na ciemnej planszy
+        }
+
+        document.documentElement.style.setProperty(
+          "--black-piece",
+          blackPieceColor
+        );
+
+        // Aktualizuj przyciski
+        document.querySelectorAll(".theme-btn").forEach(function (btn) {
+          btn.classList.toggle("selected", btn.dataset.theme === themeName);
+        });
+
+        if (!skipRender && G.board && G.board.length > 0) {
+          renderBoard();
+        }
+      }
 
       // ===== SYSTEM DŹWIĘKÓW (jak chess.com) =====
       var audioContext = null;
@@ -4760,11 +4985,19 @@
               pieceEl.innerHTML =
                 '<span class="piece-symbol">' + piece.symbol + "</span>";
               tile.appendChild(pieceEl);
-              if (piece.type === "king" && G.inCheck === piece.color)
+              if (piece.type === "king" && G.inCheck === piece.color) {
                 tile.classList.add("threatened-king");
+                // Czerwony błysk przy szachu, złoty przy macie
+                if (G.gameOver) {
+                  pieceEl.classList.add("in-mate");
+                } else {
+                  pieceEl.classList.add("in-check");
+                }
+              }
 
-              // Ikona oceny ruchu (jak w chess.com)
+              // Ikona oceny ruchu (jak w chess.com) - tylko gdy showEval włączone
               if (
+                G.showEval &&
                 G.lastMove &&
                 G.lastMove.endX === x &&
                 G.lastMove.endY === y &&
@@ -7581,9 +7814,15 @@
         .addEventListener("change", function () {
           G.showEval = this.checked;
           var evalBar = document.getElementById("eval-bar");
+          var moveIconsLegend = document.querySelector(".move-icons-legend");
           if (evalBar) {
             evalBar.style.display = this.checked ? "block" : "none";
           }
+          if (moveIconsLegend) {
+            moveIconsLegend.style.display = this.checked ? "flex" : "none";
+          }
+          // Ukryj/pokaż ikony na figurach
+          renderBoard();
         });
       document
         .getElementById("btn-first")
@@ -7625,6 +7864,13 @@
         .getElementById("draw-decline")
         .addEventListener("click", declineDraw);
 
+      // Przyciski wyboru motywu planszy
+      document.querySelectorAll(".theme-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          applyBoardTheme(this.dataset.theme);
+        });
+      });
+
       function startGame() {
         document.querySelectorAll(".nav-btn").forEach(function (b) {
           b.classList.remove("active");
@@ -7641,6 +7887,7 @@
       initProfile();
       checkLobbyUrl();
       initBoard();
+      applyBoardTheme(currentTheme, true); // skipRender=true bo zaraz wywołamy renderBoard
       renderBoard();
       updateUI();
       updateEvalBar();
