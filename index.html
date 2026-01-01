@@ -412,6 +412,58 @@
         flex: 1;
         min-width: 0;
       }
+      .game-board-container.flipped {
+        flex-direction: column-reverse;
+      }
+      .board-with-eval {
+        display: flex;
+        align-items: stretch;
+        gap: 10px;
+      }
+      .eval-bar {
+        width: 25px;
+        height: min(65vh, 500px);
+        background: var(--accent-magenta);
+        border-radius: 4px;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .eval-white {
+        background: var(--white-piece);
+        transition: height 0.5s ease;
+        height: 50%;
+      }
+      .eval-black {
+        background: var(--accent-magenta);
+        flex: 1;
+      }
+      .eval-marker {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--accent-gold);
+        top: 50%;
+        transform: translateY(-50%);
+        transition: top 0.5s ease;
+        box-shadow: 0 0 8px var(--accent-gold);
+      }
+      .eval-value {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        font-family: "Orbitron", monospace;
+        font-size: 0.65rem;
+        color: var(--bg-dark);
+        background: rgba(255, 255, 255, 0.9);
+        padding: 2px 4px;
+        border-radius: 2px;
+        white-space: nowrap;
+        transition: top 0.5s ease;
+      }
       .board-wrapper {
         position: relative;
         padding: 25px;
@@ -1103,6 +1155,22 @@
         padding-bottom: 8px;
         border-bottom: 1px solid rgba(0, 212, 255, 0.3);
       }
+      .rules-icons-legend {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin: 15px 0;
+        padding: 15px;
+        background: var(--bg-light);
+        border-radius: 5px;
+      }
+      .rules-icon-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+      }
       .rules-section h3 {
         font-family: "Orbitron", monospace;
         font-size: 0.95rem;
@@ -1336,6 +1404,99 @@
         top: auto;
         left: auto;
         right: 4px;
+      }
+      .board-wrapper.rotated .move-icon {
+        transform: rotate(180deg);
+      }
+      .board-wrapper.rotated .move-icons-legend {
+        transform: rotate(180deg);
+      }
+
+      /* Emotki ruchów */
+      .move-icon {
+        position: absolute;
+        top: -8px;
+        right: -5px;
+        font-size: 0.7rem;
+        font-weight: bold;
+        padding: 2px 4px;
+        border-radius: 4px;
+        z-index: 10;
+        font-family: "Orbitron", monospace;
+        line-height: 1;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+      }
+      .move-icon.brilliant {
+        background: #1baca6;
+        color: white;
+      }
+      .move-icon.great {
+        background: #5c8bb0;
+        color: white;
+      }
+      .move-icon.good {
+        background: #97af8b;
+        color: white;
+      }
+      .move-icon.book {
+        background: #a88865;
+        color: white;
+      }
+      .move-icon.inaccuracy {
+        background: #e6a837;
+        color: black;
+      }
+      .move-icon.mistake {
+        background: #e68a37;
+        color: white;
+      }
+      .move-icon.blunder {
+        background: #ca3431;
+        color: white;
+      }
+
+      /* Legenda emotek */
+      .move-icons-legend {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 8px;
+        flex-wrap: wrap;
+      }
+      .icon-item {
+        font-size: 0.65rem;
+        font-weight: bold;
+        padding: 3px 6px;
+        border-radius: 3px;
+        font-family: "Orbitron", monospace;
+      }
+      .icon-item.brilliant {
+        background: #1baca6;
+        color: white;
+      }
+      .icon-item.great {
+        background: #5c8bb0;
+        color: white;
+      }
+      .icon-item.good {
+        background: #97af8b;
+        color: white;
+      }
+      .icon-item.book {
+        background: #a88865;
+        color: white;
+      }
+      .icon-item.inaccuracy {
+        background: #e6a837;
+        color: black;
+      }
+      .icon-item.mistake {
+        background: #e68a37;
+        color: white;
+      }
+      .icon-item.blunder {
+        background: #ca3431;
+        color: white;
       }
 
       /* MOBILE - layout jak chess.com - szachownica fullscreen */
@@ -1730,24 +1891,41 @@
               </div>
               <div class="mobile-turn-moves" id="mobile-turn-moves"></div>
             </div>
-            <div class="board-wrapper" id="board-wrapper">
-              <div class="board-labels board-label-top">
-                <span>a</span><span>b</span><span>c</span><span>d</span
-                ><span>e</span><span>f</span><span>g</span><span>h</span>
+            <div class="board-with-eval">
+              <div class="eval-bar" id="eval-bar">
+                <div class="eval-white" id="eval-white"></div>
+                <div class="eval-black" id="eval-black"></div>
+                <div class="eval-marker" id="eval-marker"></div>
+                <div class="eval-value" id="eval-value">0.0</div>
               </div>
-              <div class="board-labels board-label-bottom">
-                <span>a</span><span>b</span><span>c</span><span>d</span
-                ><span>e</span><span>f</span><span>g</span><span>h</span>
+              <div class="board-wrapper" id="board-wrapper">
+                <div class="board-labels board-label-top">
+                  <span>a</span><span>b</span><span>c</span><span>d</span
+                  ><span>e</span><span>f</span><span>g</span><span>h</span>
+                </div>
+                <div class="board-labels board-label-bottom">
+                  <span>a</span><span>b</span><span>c</span><span>d</span
+                  ><span>e</span><span>f</span><span>g</span><span>h</span>
+                </div>
+                <div class="board-labels board-label-left">
+                  <span>8</span><span>7</span><span>6</span><span>5</span
+                  ><span>4</span><span>3</span><span>2</span><span>1</span>
+                </div>
+                <div class="board-labels board-label-right">
+                  <span>8</span><span>7</span><span>6</span><span>5</span
+                  ><span>4</span><span>3</span><span>2</span><span>1</span>
+                </div>
+                <div class="board" id="board"></div>
+                <div class="move-icons-legend">
+                  <span class="icon-item brilliant">!!</span>
+                  <span class="icon-item great">!</span>
+                  <span class="icon-item good">✓</span>
+                  <span class="icon-item book">📖</span>
+                  <span class="icon-item inaccuracy">?!</span>
+                  <span class="icon-item mistake">?</span>
+                  <span class="icon-item blunder">??</span>
+                </div>
               </div>
-              <div class="board-labels board-label-left">
-                <span>8</span><span>7</span><span>6</span><span>5</span
-                ><span>4</span><span>3</span><span>2</span><span>1</span>
-              </div>
-              <div class="board-labels board-label-right">
-                <span>8</span><span>7</span><span>6</span><span>5</span
-                ><span>4</span><span>3</span><span>2</span><span>1</span>
-              </div>
-              <div class="board" id="board"></div>
             </div>
             <div class="timer-display white-timer" id="white-timer">
               <span class="timer-label">BIAŁE</span>
@@ -1820,6 +1998,60 @@
       </div>
       <div class="screen rules-screen" id="rules-screen">
         <div class="rules-section">
+          <h2>◈ Ikony Oceny Ruchów</h2>
+          <p>Po każdym ruchu wyświetlana jest ikona oceny jakości ruchu:</p>
+          <div class="rules-icons-legend">
+            <div class="rules-icon-item">
+              <span class="icon-item brilliant">!!</span>
+              <strong>Brilliant</strong> – genialny ruch, znacząco poprawiający
+              pozycję
+            </div>
+            <div class="rules-icon-item">
+              <span class="icon-item great">!</span> <strong>Great</strong> –
+              świetny ruch, dobra decyzja
+            </div>
+            <div class="rules-icon-item">
+              <span class="icon-item good">✓</span> <strong>Good</strong> –
+              dobry, solidny ruch
+            </div>
+            <div class="rules-icon-item">
+              <span class="icon-item book">📖</span> <strong>Book</strong> –
+              neutralny ruch, ani dobry ani zły
+            </div>
+            <div class="rules-icon-item">
+              <span class="icon-item inaccuracy">?!</span>
+              <strong>Inaccuracy</strong> – niedokładność, można było lepiej
+            </div>
+            <div class="rules-icon-item">
+              <span class="icon-item mistake">?</span>
+              <strong>Mistake</strong> – błąd, pogarsza pozycję
+            </div>
+            <div class="rules-icon-item">
+              <span class="icon-item blunder">??</span>
+              <strong>Blunder</strong> – poważny błąd, znacząco pogarsza pozycję
+            </div>
+          </div>
+
+          <h2>◈ Podwójny Atak</h2>
+          <div class="highlight-box">
+            <p>
+              <strong>Zasada podwójnego ataku:</strong> Jeśli jedna figura jest
+              atakowana przez <strong>2 lub więcej</strong> figur jednocześnie
+              (nie licząc Phantoma, który zbija natychmiast), następuje
+              <strong>natychmiastowe zbicie</strong> – ofiara nie ma czasu na
+              ucieczkę!
+            </p>
+            <p>
+              • Pierwszy atakujący (ten który zaatakował wcześniej) wchodzi na
+              miejsce zbitej figury
+            </p>
+            <p>• Pozostali atakujący zostają na swoich pozycjach</p>
+            <p>
+              • Jeśli Nexus jest pod podwójnym atakiem →
+              <strong>natychmiastowy mat!</strong>
+            </p>
+          </div>
+
           <h2>◈ 1. Wprowadzenie do Gry</h2>
           <p>
             <strong>Strzałkowe Szachy</strong> to turowa gra strategiczna dla
@@ -2679,6 +2911,8 @@
         whatIfPlayer: null,
         isAnimating: false,
         sentinelShields: [],
+        lastMove: null,
+        evalBefore: 0,
       };
 
       // Tarcza Sentinela - specjalna figura tworzona przez dwie wieże w linii
@@ -3704,6 +3938,28 @@
               tile.appendChild(pieceEl);
               if (piece.type === "king" && G.inCheck === piece.color)
                 tile.classList.add("threatened-king");
+
+              // Ikona oceny ruchu (jak w chess.com)
+              if (
+                G.lastMove &&
+                G.lastMove.endX === x &&
+                G.lastMove.endY === y &&
+                G.lastMove.icon
+              ) {
+                var iconEl = document.createElement("div");
+                iconEl.className = "move-icon " + G.lastMove.icon;
+                var iconText = {
+                  brilliant: "!!",
+                  great: "!",
+                  good: "✓",
+                  book: "📖",
+                  inaccuracy: "?!",
+                  mistake: "?",
+                  blunder: "??",
+                };
+                iconEl.textContent = iconText[G.lastMove.icon] || "";
+                tile.appendChild(iconEl);
+              }
             }
             if (
               G.selectedPiece &&
@@ -3924,30 +4180,155 @@
 
       function updateBoardRotation() {
         var boardWrapper = document.getElementById("board-wrapper");
+        var boardContainer = document.querySelector(".game-board-container");
         if (!boardWrapper) return;
+
+        var shouldRotate = false;
 
         // Online - czarny zawsze widzi obrócone
         if (G.gameMode === "online" && myColor === "black") {
-          boardWrapper.classList.add("rotated");
-          return;
+          shouldRotate = true;
         }
-
         // PvP - obrót przy turze czarnych
-        if (G.gameMode === "pvp" && !G.gameOver && !G.analyzing) {
+        else if (G.gameMode === "pvp" && !G.gameOver && !G.analyzing) {
           if (G.currentPlayer === "black") {
-            boardWrapper.classList.add("rotated");
-          } else {
-            boardWrapper.classList.remove("rotated");
+            shouldRotate = true;
           }
-          return;
         }
 
-        boardWrapper.classList.remove("rotated");
+        if (shouldRotate) {
+          boardWrapper.classList.add("rotated");
+          if (boardContainer) boardContainer.classList.add("flipped");
+        } else {
+          boardWrapper.classList.remove("rotated");
+          if (boardContainer) boardContainer.classList.remove("flipped");
+        }
       }
 
       function shouldFlipBoard() {
         var boardWrapper = document.getElementById("board-wrapper");
         return boardWrapper && boardWrapper.classList.contains("rotated");
+      }
+
+      // Ocena pozycji - prosty algorytm
+      function evaluatePosition() {
+        var pieceValues = {
+          king: 0, // Król nie ma wartości materialnej
+          queen: 9, // Phantom
+          rook: 5, // Sentinel
+          bishop: 3, // Shade
+          knight: 3, // Drifter
+          pawn: 1, // Shard
+        };
+
+        var whiteScore = 0;
+        var blackScore = 0;
+
+        for (var y = 0; y < 8; y++) {
+          for (var x = 0; x < 8; x++) {
+            var piece = G.board[y][x];
+            if (!piece) continue;
+
+            var value = pieceValues[piece.type] || 0;
+
+            // Bonus za pozycję (centrum = lepiej)
+            var centerBonus =
+              (3.5 - Math.abs(x - 3.5)) * 0.1 + (3.5 - Math.abs(y - 3.5)) * 0.1;
+
+            // Bonus za pionki bliżej promocji
+            if (piece.type === "pawn") {
+              if (piece.color === "white") {
+                centerBonus += (7 - y) * 0.15;
+              } else {
+                centerBonus += y * 0.15;
+              }
+            }
+
+            value += centerBonus;
+
+            if (piece.color === "white") {
+              whiteScore += value;
+            } else {
+              blackScore += value;
+            }
+          }
+        }
+
+        // Sprawdź zbite figury
+        G.capturedByWhite.forEach(function (p) {
+          whiteScore += pieceValues[p.type] * 0.5; // Zbite = zyskujesz połowę wartości
+        });
+        G.capturedByBlack.forEach(function (p) {
+          blackScore += pieceValues[p.type] * 0.5;
+        });
+
+        // Sprawdź aktywne blokady
+        G.pendingCaptures.forEach(function (cap) {
+          if (cap.attackerColor === "white") {
+            whiteScore += 0.5; // Bonus za atak
+          } else {
+            blackScore += 0.5;
+          }
+        });
+
+        // Szach = duży bonus
+        if (G.inCheck === "white") blackScore += 2;
+        if (G.inCheck === "black") whiteScore += 2;
+
+        return whiteScore - blackScore;
+      }
+
+      function updateEvalBar() {
+        var eval = evaluatePosition();
+
+        // Przekształć eval na procent (sigmoid-like)
+        // eval = 0 -> 50%, eval = +10 -> ~95%, eval = -10 -> ~5%
+        var percentage = 50 + (eval / (Math.abs(eval) + 5)) * 45;
+        percentage = Math.max(2, Math.min(98, percentage));
+
+        var whiteBar = document.getElementById("eval-white");
+        var marker = document.getElementById("eval-marker");
+        var valueDisplay = document.getElementById("eval-value");
+
+        if (whiteBar) whiteBar.style.height = percentage + "%";
+        if (marker) marker.style.top = 100 - percentage + "%";
+
+        if (valueDisplay) {
+          var displayVal = eval >= 0 ? "+" + eval.toFixed(1) : eval.toFixed(1);
+          valueDisplay.textContent = displayVal;
+          valueDisplay.style.top = 100 - percentage + "%";
+        }
+      }
+
+      // Ocena jakości ruchu
+      function getMoveIcon(evalChange, capturedPiece, causedCheck) {
+        // Szach na króla = świetny ruch
+        if (causedCheck) {
+          return evalChange >= 3 ? "brilliant" : "great";
+        }
+
+        // Zbicie cennej figury
+        if (capturedPiece) {
+          var pieceValues = {
+            queen: 9,
+            rook: 5,
+            bishop: 3,
+            knight: 3,
+            pawn: 1,
+          };
+          var captureValue = pieceValues[capturedPiece.type] || 0;
+          if (captureValue >= 5) return evalChange >= 2 ? "brilliant" : "great";
+          if (captureValue >= 3) return "great";
+        }
+
+        // Na podstawie zmiany eval
+        if (evalChange >= 4) return "brilliant"; // !!
+        if (evalChange >= 2) return "great"; // !
+        if (evalChange >= 0.5) return "good"; // ✓
+        if (evalChange >= -0.5) return "book"; // neutralny
+        if (evalChange >= -2) return "inaccuracy"; // ?!
+        if (evalChange >= -4) return "mistake"; // ?
+        return "blunder"; // ??
       }
 
       function updateMoveLog(text, color) {
@@ -4370,6 +4751,9 @@
         if (G.analyzing) return;
         if (G.isAnimating) return;
 
+        // Zapisz eval przed ruchem
+        G.evalBefore = evaluatePosition();
+
         var startPos = G.selectedPiece;
         var endPos = G.plannedPath[G.plannedPath.length - 1];
         var piece = G.board[startPos.y][startPos.x];
@@ -4512,6 +4896,21 @@
         G.usedDiagonal = false;
         addTimeIncrement();
 
+        // Oblicz ocenę ruchu
+        var evalAfter = evaluatePosition();
+        var evalChange =
+          moveColor === "white"
+            ? evalAfter - G.evalBefore
+            : G.evalBefore - evalAfter;
+
+        // Zapisz ostatni ruch z oceną
+        G.lastMove = {
+          endX: endPos.x,
+          endY: endPos.y,
+          color: moveColor,
+          icon: getMoveIcon(evalChange, targetPiece, G.inCheck),
+        };
+
         // Zapisz stan przed processPendingCaptures
         saveGameState(moveDesc, moveColor);
 
@@ -4525,7 +4924,80 @@
         var captureDesc = "";
         var captureColor = "";
 
+        // Sprawdź czy jakieś pole jest atakowane przez 2+ figury
+        var attackCounts = {};
         G.pendingCaptures.forEach(function (cap) {
+          var key = cap.targetX + "," + cap.targetY;
+          if (!attackCounts[key]) {
+            attackCounts[key] = [];
+          }
+          attackCounts[key].push(cap);
+        });
+
+        // Jeśli figura jest atakowana przez 2+, natychmiastowe zbicie
+        for (var key in attackCounts) {
+          if (attackCounts[key].length >= 2) {
+            var firstAttack = attackCounts[key][0]; // Pierwszy atakujący wchodzi
+            var targetPiece = G.board[firstAttack.targetY]
+              ? G.board[firstAttack.targetY][firstAttack.targetX]
+              : null;
+
+            if (
+              targetPiece &&
+              targetPiece.color !== firstAttack.attackerColor
+            ) {
+              // Nexus pod podwójnym atakiem = mat
+              if (targetPiece.type === "king") {
+                endGame(firstAttack.attackerColor, "mat");
+                return;
+              }
+
+              // Zbij figurę
+              (targetPiece.color === "white"
+                ? G.capturedByBlack
+                : G.capturedByWhite
+              ).push(targetPiece);
+              G.board[firstAttack.targetY][firstAttack.targetX] =
+                firstAttack.attackerPiece;
+
+              // Usuń pierwszego atakującego z jego pozycji
+              if (
+                G.board[firstAttack.attackerY] &&
+                G.board[firstAttack.attackerY][firstAttack.attackerX] &&
+                G.board[firstAttack.attackerY][firstAttack.attackerX].symbol ===
+                  firstAttack.attackerSymbol
+              ) {
+                G.board[firstAttack.attackerY][firstAttack.attackerX] = null;
+              }
+
+              // Usuń wszystkich atakujących z tego pola z pending (ale nie pierwszego który już wszedł)
+              attackCounts[key].forEach(function (cap, index) {
+                if (index > 0) {
+                  // Drugi i kolejni atakujący wracają na swoje pozycje (zostają w miejscu)
+                }
+              });
+
+              captureHappened = true;
+              captureDesc =
+                "Podwójny atak! " +
+                firstAttack.attackerSymbol +
+                " zbija " +
+                targetPiece.symbol +
+                "!";
+              captureColor = firstAttack.attackerColor;
+
+              // Oznacz te ataki jako zakończone
+              attackCounts[key].forEach(function (cap) {
+                cap.resolved = true;
+              });
+            }
+          }
+        }
+
+        G.pendingCaptures.forEach(function (cap) {
+          // Pomiń już rozwiązane ataki
+          if (cap.resolved) return;
+
           var targetPiece = G.board[cap.targetY]
             ? G.board[cap.targetY][cap.targetX]
             : null;
@@ -4644,6 +5116,7 @@
 
         renderBoard();
         updateUI();
+        updateEvalBar();
         if (G.gameOver) return;
         if (!hasLegalMoves(G.currentPlayer)) {
           if (G.inCheck === G.currentPlayer) {
@@ -4806,6 +5279,9 @@
             }
             if (inPath) continue;
             if (isLocked && targetPiece) continue;
+
+            // Sprawdź Tarczę Sentinela - nie można wejść na pola tarczy przeciwnika
+            if (isBlockedByShield(newX, newY, piece.color)) continue;
 
             // Jeśli na polu jest wroga figura - można tam wejść tylko jako ostatni krok
             // NIE można przechodzić przez wrogie figury
@@ -5267,6 +5743,7 @@
       initBoard();
       renderBoard();
       updateUI();
+      updateEvalBar();
     </script>
   </body>
 </html>
