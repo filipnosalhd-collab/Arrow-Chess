@@ -1,0 +1,4231 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Strzałkowe Szachy</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap");
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      :root {
+        --bg-dark: #0a0a0f;
+        --bg-medium: #12121a;
+        --bg-light: #1a1a25;
+        --accent-cyan: #00d4ff;
+        --accent-magenta: #ff00aa;
+        --accent-gold: #ffd700;
+        --text-primary: #e8e8f0;
+        --text-secondary: #8888aa;
+        --white-piece: #e0e8ff;
+        --tile-light: #2a2a3a;
+        --tile-dark: #1a1a28;
+        --highlight: rgba(0, 212, 255, 0.4);
+        --threat: rgba(255, 0, 100, 0.4);
+        --valid-move: rgba(0, 255, 100, 0.3);
+        --zone-center: rgba(255, 215, 0, 0.18);
+        --zone-nexus-white: rgba(0, 150, 255, 0.15);
+        --zone-phantom-white: rgba(0, 255, 150, 0.15);
+        --zone-nexus-black: rgba(255, 100, 100, 0.15);
+        --zone-phantom-black: rgba(255, 150, 0, 0.15);
+      }
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+      }
+      body {
+        font-family: "Rajdhani", sans-serif;
+        background: var(--bg-dark);
+        color: var(--text-primary);
+      }
+      .bg-pattern {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(
+            circle at 20% 20%,
+            rgba(0, 212, 255, 0.05) 0%,
+            transparent 50%
+          ),
+          radial-gradient(
+            circle at 80% 80%,
+            rgba(255, 0, 170, 0.05) 0%,
+            transparent 50%
+          );
+        pointer-events: none;
+        z-index: 0;
+      }
+      .container {
+        position: relative;
+        z-index: 1;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        padding: 15px;
+        overflow: hidden;
+        max-width: 1600px;
+        margin: 0 auto;
+      }
+      header {
+        text-align: center;
+        padding: 15px 0;
+        flex-shrink: 0;
+      }
+      h1 {
+        font-family: "Orbitron", monospace;
+        font-size: 2.2rem;
+        font-weight: 900;
+        letter-spacing: 5px;
+        background: linear-gradient(
+          135deg,
+          var(--accent-cyan),
+          var(--accent-magenta)
+        );
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-transform: uppercase;
+      }
+      .subtitle {
+        font-size: 1rem;
+        color: var(--text-secondary);
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        margin-top: 5px;
+      }
+      nav {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding: 10px 0;
+        flex-shrink: 0;
+      }
+      .nav-btn {
+        font-family: "Orbitron", monospace;
+        padding: 10px 25px;
+        background: transparent;
+        border: 2px solid var(--accent-cyan);
+        color: var(--accent-cyan);
+        font-size: 0.9rem;
+        font-weight: 600;
+        letter-spacing: 2px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+      }
+      .nav-btn:hover,
+      .nav-btn.active {
+        background: var(--accent-cyan);
+        color: var(--bg-dark);
+        box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+      }
+      .screen {
+        display: none;
+        flex: 1;
+        overflow: hidden;
+      }
+      .screen.active {
+        display: flex;
+        flex-direction: column;
+        animation: fadeIn 0.3s ease;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      .menu-screen {
+        text-align: center;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+        overflow-y: auto;
+      }
+      .menu-title {
+        font-family: "Orbitron", monospace;
+        font-size: 1.5rem;
+        margin-bottom: 25px;
+        color: var(--accent-gold);
+      }
+      .game-modes {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+      .mode-card {
+        background: var(--bg-medium);
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        padding: 25px;
+        width: 250px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      .mode-card:hover {
+        border-color: var(--accent-cyan);
+        transform: translateY(-3px);
+        box-shadow: 0 10px 30px rgba(0, 212, 255, 0.2);
+      }
+      .mode-icon {
+        font-size: 2.5rem;
+        margin-bottom: 12px;
+      }
+      .mode-name {
+        font-family: "Orbitron", monospace;
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      .mode-desc {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        line-height: 1.4;
+      }
+      .difficulty-select {
+        margin-top: 25px;
+      }
+      .difficulty-select h3 {
+        font-family: "Orbitron", monospace;
+        font-size: 1.1rem;
+        margin-bottom: 15px;
+        color: var(--text-secondary);
+      }
+      .difficulty-btns {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        flex-wrap: wrap;
+      }
+      .diff-btn {
+        padding: 12px 28px;
+        background: var(--bg-light);
+        border: 2px solid transparent;
+        color: var(--text-primary);
+        font-family: "Rajdhani", sans-serif;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      .diff-btn.easy {
+        border-color: #00ff88;
+        color: #00ff88;
+      }
+      .diff-btn.medium {
+        border-color: var(--accent-gold);
+        color: var(--accent-gold);
+      }
+      .diff-btn.hard {
+        border-color: var(--accent-magenta);
+        color: var(--accent-magenta);
+      }
+      .diff-btn.selected {
+        background: currentColor;
+        color: var(--bg-dark);
+      }
+      .time-select,
+      .increment-select {
+        margin-top: 20px;
+      }
+      .time-select h3,
+      .increment-select h4 {
+        font-family: "Orbitron", monospace;
+        font-size: 1rem;
+        margin-bottom: 12px;
+        color: var(--text-secondary);
+      }
+      .time-btns,
+      .increment-btns {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .time-btn,
+      .inc-btn {
+        padding: 10px 18px;
+        background: var(--bg-light);
+        border: 2px solid var(--accent-cyan);
+        color: var(--accent-cyan);
+        font-family: "Rajdhani", sans-serif;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      .time-btn:hover,
+      .inc-btn:hover {
+        background: rgba(0, 212, 255, 0.2);
+      }
+      .time-btn.selected,
+      .inc-btn.selected {
+        background: var(--accent-cyan);
+        color: var(--bg-dark);
+      }
+      .timer-display {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 20px;
+        background: var(--bg-medium);
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        min-width: 200px;
+      }
+      .timer-display.active {
+        border-color: var(--accent-gold);
+        box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+      }
+      .timer-display.low-time {
+        border-color: var(--accent-magenta);
+        animation: lowTimePulse 0.5s infinite;
+      }
+      @keyframes lowTimePulse {
+        0%,
+        100% {
+          box-shadow: 0 0 8px rgba(255, 0, 170, 0.5);
+        }
+        50% {
+          box-shadow: 0 0 20px rgba(255, 0, 170, 0.8);
+        }
+      }
+      .timer-label {
+        font-family: "Orbitron", monospace;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+      }
+      .timer-value {
+        font-family: "Orbitron", monospace;
+        font-size: 1.3rem;
+        font-weight: bold;
+        color: var(--text-primary);
+      }
+      .white-timer .timer-value {
+        color: var(--white-piece);
+      }
+      .black-timer .timer-value {
+        color: var(--accent-magenta);
+      }
+      .game-screen.active {
+        flex-direction: row;
+      }
+      .game-layout {
+        display: flex;
+        flex: 1;
+        gap: 15px;
+        align-items: stretch;
+        height: 100%;
+        overflow: hidden;
+      }
+      .side-panel {
+        background: var(--bg-medium);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 15px;
+        width: 200px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+      }
+      .side-panel::-webkit-scrollbar {
+        width: 4px;
+      }
+      .side-panel::-webkit-scrollbar-thumb {
+        background: var(--accent-cyan);
+      }
+      .panel-title {
+        font-family: "Orbitron", monospace;
+        font-size: 0.85rem;
+        color: var(--accent-cyan);
+        margin-bottom: 10px;
+        letter-spacing: 1px;
+      }
+      .captured-pieces {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        min-height: 40px;
+      }
+      .captured-piece {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        opacity: 0.7;
+      }
+      .turn-indicator {
+        text-align: center;
+        padding: 10px;
+        background: var(--bg-light);
+        margin-bottom: 12px;
+        border-left: 3px solid var(--accent-cyan);
+      }
+      .turn-indicator.white-turn {
+        border-left-color: var(--white-piece);
+      }
+      .turn-indicator.black-turn {
+        border-left-color: var(--accent-magenta);
+      }
+      .turn-label {
+        font-family: "Orbitron";
+        font-size: 0.7rem;
+        color: var(--text-secondary);
+      }
+      .turn-player {
+        font-size: 1.1rem;
+        font-weight: bold;
+      }
+      .move-info-panel {
+        margin-top: 10px;
+        padding: 10px;
+        background: var(--bg-light);
+        font-size: 0.85rem;
+        text-align: center;
+      }
+      .move-info-panel .piece-name {
+        color: var(--accent-gold);
+        font-weight: bold;
+        font-size: 0.9rem;
+      }
+      .move-info-panel .moves-left {
+        color: var(--accent-cyan);
+        font-family: "Orbitron", monospace;
+        font-size: 1rem;
+      }
+      .game-board-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+        min-width: 0;
+      }
+      .board-wrapper {
+        position: relative;
+        padding: 25px;
+      }
+      .board-labels {
+        position: absolute;
+        font-family: "Orbitron", monospace;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        pointer-events: none;
+      }
+      .board-label-top {
+        top: 3px;
+        left: 25px;
+        right: 25px;
+        display: flex;
+        justify-content: space-around;
+      }
+      .board-label-bottom {
+        bottom: 3px;
+        left: 25px;
+        right: 25px;
+        display: flex;
+        justify-content: space-around;
+      }
+      .board-label-left {
+        left: 3px;
+        top: 25px;
+        bottom: 25px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-around;
+        align-items: center;
+      }
+      .board-label-right {
+        right: 3px;
+        top: 25px;
+        bottom: 25px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-around;
+        align-items: center;
+      }
+      .board {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 2px;
+        background: rgba(255, 255, 255, 0.12);
+        padding: 2px;
+        width: min(65vh, 500px);
+        height: min(65vh, 500px);
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+      }
+      .tile {
+        aspect-ratio: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        position: relative;
+        transition: all 0.2s ease;
+      }
+      .tile.light {
+        background: var(--tile-light);
+      }
+      .tile.dark {
+        background: var(--tile-dark);
+      }
+      .tile.zone-center {
+        background: linear-gradient(
+            135deg,
+            var(--zone-center),
+            var(--zone-center)
+          ),
+          var(--tile-light);
+      }
+      .tile.dark.zone-center {
+        background: linear-gradient(
+            135deg,
+            var(--zone-center),
+            var(--zone-center)
+          ),
+          var(--tile-dark);
+      }
+      .tile.zone-nexus-white {
+        background: linear-gradient(
+            135deg,
+            var(--zone-nexus-white),
+            var(--zone-nexus-white)
+          ),
+          var(--tile-light);
+      }
+      .tile.dark.zone-nexus-white {
+        background: linear-gradient(
+            135deg,
+            var(--zone-nexus-white),
+            var(--zone-nexus-white)
+          ),
+          var(--tile-dark);
+      }
+      .tile.zone-phantom-white {
+        background: linear-gradient(
+            135deg,
+            var(--zone-phantom-white),
+            var(--zone-phantom-white)
+          ),
+          var(--tile-light);
+      }
+      .tile.dark.zone-phantom-white {
+        background: linear-gradient(
+            135deg,
+            var(--zone-phantom-white),
+            var(--zone-phantom-white)
+          ),
+          var(--tile-dark);
+      }
+      .tile.zone-nexus-black {
+        background: linear-gradient(
+            135deg,
+            var(--zone-nexus-black),
+            var(--zone-nexus-black)
+          ),
+          var(--tile-light);
+      }
+      .tile.dark.zone-nexus-black {
+        background: linear-gradient(
+            135deg,
+            var(--zone-nexus-black),
+            var(--zone-nexus-black)
+          ),
+          var(--tile-dark);
+      }
+      .tile.zone-phantom-black {
+        background: linear-gradient(
+            135deg,
+            var(--zone-phantom-black),
+            var(--zone-phantom-black)
+          ),
+          var(--tile-light);
+      }
+      .tile.dark.zone-phantom-black {
+        background: linear-gradient(
+            135deg,
+            var(--zone-phantom-black),
+            var(--zone-phantom-black)
+          ),
+          var(--tile-dark);
+      }
+      .tile.selected {
+        background: var(--highlight) !important;
+        box-shadow: inset 0 0 20px rgba(0, 212, 255, 0.6);
+      }
+      .tile.valid-move {
+        background: var(--valid-move) !important;
+        cursor: pointer;
+      }
+      .tile.threat {
+        background: var(--threat) !important;
+      }
+      .tile.threatened-king {
+        animation: kingThreat 0.5s infinite;
+      }
+      @keyframes kingThreat {
+        0%,
+        100% {
+          box-shadow: inset 0 0 20px rgba(255, 0, 100, 0.8);
+        }
+        50% {
+          box-shadow: inset 0 0 40px rgba(255, 0, 100, 1);
+        }
+      }
+      .piece {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s ease;
+        position: relative;
+        z-index: 2;
+      }
+      .piece:hover {
+        transform: scale(1.1);
+      }
+      .piece.attacking {
+        opacity: 0.7;
+        cursor: not-allowed;
+      }
+      .piece.attacking:hover {
+        transform: none;
+      }
+      .piece.white {
+        color: var(--white-piece);
+        text-shadow: 0 2px 12px rgba(224, 232, 255, 0.6);
+      }
+      .piece.black {
+        color: var(--accent-magenta);
+        text-shadow: 0 2px 12px rgba(255, 0, 170, 0.6);
+      }
+      .piece-symbol {
+        font-size: 2rem;
+        font-weight: bold;
+        line-height: 1;
+      }
+      /* Animacja ruchu figury */
+      .moving-piece {
+        position: absolute;
+        z-index: 100;
+        pointer-events: none;
+        transition: left 0.3s ease-out, top 0.3s ease-out;
+      }
+      .moving-piece .piece-symbol {
+        font-size: 2rem;
+        font-weight: bold;
+      }
+      .moving-piece.white {
+        color: var(--white-piece);
+        text-shadow: 0 2px 15px rgba(224, 232, 255, 0.8);
+      }
+      .moving-piece.black {
+        color: var(--accent-magenta);
+        text-shadow: 0 2px 15px rgba(255, 0, 170, 0.8);
+      }
+      .path-arrow {
+        position: absolute;
+        font-size: 1.5rem;
+        color: var(--accent-gold);
+        z-index: 1;
+        text-shadow: 0 0 10px rgba(255, 215, 0, 0.9);
+        pointer-events: none;
+      }
+      .lock-arrow {
+        position: absolute;
+        font-size: 1.3rem;
+        z-index: 3;
+        text-shadow: 0 0 12px currentColor;
+        pointer-events: none;
+        animation: lockPulse 1s infinite;
+      }
+      .lock-arrow.white-lock {
+        color: var(--white-piece);
+      }
+      .lock-arrow.black-lock {
+        color: var(--accent-magenta);
+      }
+      @keyframes lockPulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.7;
+          transform: scale(1.15);
+        }
+      }
+      .lock-timer {
+        position: absolute;
+        bottom: 3px;
+        right: 4px;
+        font-size: 0.75rem;
+        font-family: "Orbitron", monospace;
+        z-index: 4;
+        padding: 1px 4px;
+        border-radius: 3px;
+        background: rgba(0, 0, 0, 0.8);
+      }
+      .lock-timer.white-lock {
+        color: var(--white-piece);
+      }
+      .lock-timer.black-lock {
+        color: var(--accent-magenta);
+      }
+      .attacker-pos {
+        position: absolute;
+        top: 3px;
+        left: 4px;
+        font-size: 0.9rem;
+        z-index: 4;
+        opacity: 0.7;
+      }
+      /* Online / Profil */
+      .profile-bar {
+        position: absolute;
+        top: 5px;
+        left: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        z-index: 50;
+      }
+      .profile-name {
+        font-family: "Orbitron", monospace;
+        font-size: 0.85rem;
+        color: var(--accent-cyan);
+        padding: 5px 12px;
+        background: var(--bg-medium);
+        border: 1px solid var(--accent-cyan);
+        cursor: pointer;
+      }
+      .profile-name:hover {
+        background: rgba(0, 212, 255, 0.2);
+      }
+      .no-profile {
+        color: var(--accent-magenta);
+        border-color: var(--accent-magenta);
+      }
+      .no-profile:hover {
+        background: rgba(255, 0, 170, 0.2);
+      }
+      @media (max-width: 900px) {
+        .profile-bar {
+          top: 30px;
+          left: 5px;
+        }
+        .profile-name {
+          font-size: 0.6rem;
+          padding: 3px 8px;
+        }
+      }
+      /* Ekran profilu */
+      .profile-screen {
+        text-align: center;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+      }
+      .profile-form {
+        background: var(--bg-medium);
+        border: 2px solid var(--accent-cyan);
+        padding: 30px;
+        max-width: 400px;
+      }
+      .profile-form h2 {
+        font-family: "Orbitron", monospace;
+        font-size: 1.3rem;
+        color: var(--accent-cyan);
+        margin-bottom: 20px;
+      }
+      .profile-form input {
+        width: 100%;
+        padding: 12px;
+        background: var(--bg-dark);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        color: var(--text-primary);
+        font-family: "Rajdhani", sans-serif;
+        font-size: 1.1rem;
+        margin-bottom: 15px;
+        text-align: center;
+      }
+      .profile-form input:focus {
+        outline: none;
+        border-color: var(--accent-cyan);
+      }
+      .profile-form .save-btn {
+        padding: 12px 30px;
+        background: var(--accent-cyan);
+        border: none;
+        color: var(--bg-dark);
+        font-family: "Orbitron", monospace;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+      .profile-form .save-btn:hover {
+        box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+      }
+      /* Lobby Online */
+      .lobby-screen {
+        text-align: center;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+      }
+      .lobby-box {
+        background: var(--bg-medium);
+        border: 2px solid var(--accent-gold);
+        padding: 30px;
+        max-width: 500px;
+        width: 100%;
+      }
+      .lobby-box h2 {
+        font-family: "Orbitron", monospace;
+        font-size: 1.3rem;
+        color: var(--accent-gold);
+        margin-bottom: 20px;
+      }
+      .lobby-link {
+        display: block;
+        background: var(--bg-dark);
+        padding: 15px;
+        margin: 15px 0;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        word-break: break-all;
+        font-family: monospace;
+        font-size: 0.9rem;
+        color: var(--accent-cyan);
+        text-decoration: none;
+      }
+      .lobby-link:hover {
+        background: rgba(0, 212, 255, 0.1);
+        border-color: var(--accent-cyan);
+      }
+      .lobby-link-copy {
+        padding: 8px 20px;
+        background: var(--accent-cyan);
+        border: none;
+        color: var(--bg-dark);
+        font-family: "Orbitron", monospace;
+        font-size: 0.8rem;
+        cursor: pointer;
+        margin-top: 10px;
+      }
+      .lobby-players {
+        margin: 20px 0;
+        padding: 15px;
+        background: var(--bg-light);
+      }
+      .lobby-players h3 {
+        font-family: "Orbitron", monospace;
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        margin-bottom: 10px;
+      }
+      .player-slot {
+        padding: 10px;
+        margin: 5px 0;
+        background: var(--bg-dark);
+        border-left: 3px solid var(--accent-cyan);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .player-slot.empty {
+        border-left-color: var(--text-secondary);
+        opacity: 0.5;
+      }
+      .player-slot .player-name {
+        font-family: "Orbitron", monospace;
+        font-size: 0.85rem;
+      }
+      .player-slot .player-status {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+      }
+      .waiting-text {
+        color: var(--accent-gold);
+        font-size: 1rem;
+        animation: pulse 1.5s infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+      .start-game-btn {
+        padding: 15px 40px;
+        background: var(--accent-gold);
+        border: none;
+        color: var(--bg-dark);
+        font-family: "Orbitron", monospace;
+        font-size: 1rem;
+        cursor: pointer;
+        margin-top: 15px;
+      }
+      .start-game-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .start-game-btn:not(:disabled):hover {
+        box-shadow: 0 0 25px rgba(255, 215, 0, 0.5);
+      }
+      .leave-lobby-btn {
+        padding: 10px 25px;
+        background: transparent;
+        border: 2px solid var(--accent-magenta);
+        color: var(--accent-magenta);
+        font-family: "Orbitron", monospace;
+        font-size: 0.85rem;
+        cursor: pointer;
+        margin-top: 15px;
+      }
+      .leave-lobby-btn:hover {
+        background: rgba(255, 0, 170, 0.2);
+      }
+      .pending-captures {
+        margin-top: 12px;
+        padding: 10px;
+        background: rgba(255, 0, 100, 0.1);
+        border: 1px solid rgba(255, 0, 100, 0.3);
+      }
+      .pending-title {
+        font-family: "Orbitron", monospace;
+        font-size: 0.75rem;
+        color: var(--accent-magenta);
+        margin-bottom: 8px;
+      }
+      .pending-item {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        padding: 4px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .legend {
+        margin-top: 12px;
+        padding: 10px;
+        background: var(--bg-light);
+      }
+      .legend-title {
+        font-family: "Orbitron", monospace;
+        font-size: 0.75rem;
+        color: var(--accent-gold);
+        margin-bottom: 8px;
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        margin-bottom: 5px;
+      }
+      .legend-color {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+      }
+      .legend-color.center {
+        background: rgba(255, 215, 0, 0.5);
+      }
+      .legend-color.nexus-white {
+        background: rgba(0, 150, 255, 0.5);
+      }
+      .legend-color.phantom-white {
+        background: rgba(0, 255, 150, 0.5);
+      }
+      .legend-color.nexus-black {
+        background: rgba(255, 100, 100, 0.5);
+      }
+      .legend-color.phantom-black {
+        background: rgba(255, 150, 0, 0.5);
+      }
+      .zone-toggle {
+        margin-top: 8px;
+      }
+      .zone-toggle label {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .zone-toggle input {
+        cursor: pointer;
+        width: 14px;
+        height: 14px;
+      }
+      .rules-screen {
+        flex: 1;
+        overflow-y: auto;
+        padding: 15px;
+      }
+      .rules-screen::-webkit-scrollbar {
+        width: 6px;
+      }
+      .rules-screen::-webkit-scrollbar-thumb {
+        background: var(--accent-cyan);
+      }
+      .rules-section {
+        background: var(--bg-medium);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 20px;
+        margin-bottom: 15px;
+      }
+      .rules-section h2 {
+        font-family: "Orbitron", monospace;
+        font-size: 1.1rem;
+        color: var(--accent-cyan);
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid rgba(0, 212, 255, 0.3);
+      }
+      .rules-section h3 {
+        font-family: "Orbitron", monospace;
+        font-size: 0.95rem;
+        color: var(--accent-gold);
+        margin: 12px 0 8px;
+      }
+      .rules-section p {
+        color: var(--text-secondary);
+        line-height: 1.6;
+        margin-bottom: 8px;
+        font-size: 0.9rem;
+      }
+      .piece-showcase {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 12px;
+        margin-top: 12px;
+      }
+      .piece-card {
+        background: var(--bg-light);
+        padding: 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-left: 3px solid var(--accent-cyan);
+      }
+      .piece-card-symbol {
+        font-size: 2.2rem;
+        color: var(--white-piece);
+      }
+      .piece-card-info h4 {
+        font-family: "Orbitron", monospace;
+        font-size: 0.85rem;
+        margin-bottom: 4px;
+      }
+      .piece-card-info p {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        margin: 0;
+        line-height: 1.4;
+      }
+      .highlight-box {
+        background: rgba(0, 212, 255, 0.1);
+        border-left: 3px solid var(--accent-cyan);
+        padding: 10px 12px;
+        margin: 10px 0;
+        font-size: 0.85rem;
+      }
+      .warning-box {
+        background: rgba(255, 0, 100, 0.1);
+        border-left: 3px solid var(--accent-magenta);
+        padding: 10px 12px;
+        margin: 10px 0;
+        font-size: 0.85rem;
+      }
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-overlay.active {
+        display: flex;
+      }
+      .modal {
+        background: var(--bg-medium);
+        border: 2px solid var(--accent-cyan);
+        padding: 35px;
+        text-align: center;
+        max-width: 400px;
+        animation: modalIn 0.3s ease;
+      }
+      @keyframes modalIn {
+        from {
+          transform: scale(0.8);
+          opacity: 0;
+        }
+        to {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      .modal h2 {
+        font-family: "Orbitron", monospace;
+        font-size: 1.8rem;
+        margin-bottom: 15px;
+        background: linear-gradient(
+          135deg,
+          var(--accent-cyan),
+          var(--accent-magenta)
+        );
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .modal p {
+        color: var(--text-secondary);
+        margin-bottom: 20px;
+        font-size: 1.1rem;
+      }
+      .modal-btn {
+        padding: 12px 35px;
+        background: var(--accent-cyan);
+        border: none;
+        color: var(--bg-dark);
+        font-family: "Orbitron", monospace;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      .modal-btn:hover {
+        box-shadow: 0 0 25px rgba(0, 212, 255, 0.6);
+      }
+      .move-log {
+        flex: 1;
+        overflow-y: auto;
+        font-size: 0.8rem;
+      }
+      .move-log::-webkit-scrollbar {
+        width: 4px;
+      }
+      .move-log::-webkit-scrollbar-thumb {
+        background: var(--accent-cyan);
+      }
+      .log-entry {
+        padding: 6px 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .log-entry:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .log-entry.active-state {
+        background: rgba(0, 212, 255, 0.2);
+        border-left: 2px solid var(--accent-cyan);
+      }
+      .log-entry.white-move {
+        border-left: 2px solid var(--white-piece);
+      }
+      .log-entry.black-move {
+        border-left: 2px solid var(--accent-magenta);
+      }
+      .analysis-controls {
+        margin-top: 10px;
+        padding: 10px;
+        background: rgba(0, 212, 255, 0.1);
+        border: 1px solid rgba(0, 212, 255, 0.3);
+      }
+      .state-info {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        margin-bottom: 8px;
+        text-align: center;
+      }
+      .analysis-btns {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .analysis-btn {
+        padding: 6px 12px;
+        background: var(--bg-light);
+        border: 1px solid var(--accent-cyan);
+        color: var(--accent-cyan);
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      .analysis-btn:hover {
+        background: var(--accent-cyan);
+        color: var(--bg-dark);
+      }
+      .analysis-btn.reset-btn {
+        border-color: var(--accent-magenta);
+        color: var(--accent-magenta);
+      }
+      .analysis-btn.reset-btn:hover {
+        background: var(--accent-magenta);
+      }
+      .whatif-panel {
+        margin-top: 8px;
+        padding: 8px;
+        background: rgba(255, 215, 0, 0.1);
+        border: 1px solid rgba(255, 215, 0, 0.3);
+        text-align: center;
+      }
+      .whatif-info {
+        font-size: 0.7rem;
+        color: var(--accent-gold);
+        margin-bottom: 5px;
+      }
+      .whatif-counter {
+        font-family: "Orbitron", monospace;
+        font-size: 0.85rem;
+        color: var(--accent-gold);
+      }
+
+      /* Mobile turn info - ukryte na desktop */
+      .mobile-turn-info {
+        display: none;
+      }
+
+      /* Animacja obrotu planszy */
+      .board-wrapper {
+        transition: transform 0.5s ease-in-out;
+      }
+      .board-wrapper.rotated {
+        transform: rotate(180deg);
+      }
+      .board-wrapper.rotated .piece {
+        transform: rotate(180deg);
+      }
+      .board-wrapper.rotated .path-arrow {
+        transform: rotate(180deg);
+      }
+      .board-wrapper.rotated .lock-arrow {
+        transform: rotate(180deg);
+      }
+      .board-wrapper.rotated .lock-timer {
+        transform: rotate(180deg);
+        top: 3px;
+        bottom: auto;
+        right: auto;
+        left: 4px;
+      }
+      .board-wrapper.rotated .attacker-pos {
+        transform: rotate(180deg);
+        bottom: 3px;
+        top: auto;
+        left: auto;
+        right: 4px;
+      }
+
+      /* MOBILE - layout jak chess.com - szachownica fullscreen */
+      @media (max-width: 900px) {
+        .container {
+          padding: 0;
+          height: 100vh;
+        }
+        header {
+          display: none;
+        }
+        nav {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          z-index: 100;
+          background: var(--bg-dark);
+          padding: 3px;
+          gap: 3px;
+          justify-content: center;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .nav-btn {
+          padding: 4px 10px;
+          font-size: 0.55rem;
+          border-width: 1px;
+        }
+        .game-screen.active {
+          padding-top: 28px;
+          height: 100%;
+        }
+        .game-layout {
+          flex-direction: column;
+          gap: 0;
+          height: 100%;
+        }
+        .side-panel {
+          display: none !important;
+        }
+        .game-board-container {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 5px;
+        }
+        .board {
+          width: min(calc(100vh - 140px), calc(100vw - 10px));
+          height: min(calc(100vh - 140px), calc(100vw - 10px));
+          gap: 0;
+          padding: 0;
+        }
+        .board-wrapper {
+          padding: 0;
+        }
+        .board-labels {
+          display: none;
+        }
+        .tile {
+          border: none;
+        }
+        .piece-symbol {
+          font-size: clamp(1.2rem, 10vmin, 3rem);
+        }
+        .path-arrow {
+          font-size: clamp(0.8rem, 6vmin, 2rem);
+        }
+        .lock-arrow {
+          font-size: clamp(0.7rem, 5vmin, 1.6rem);
+        }
+        .lock-timer {
+          font-size: clamp(0.4rem, 2vmin, 0.8rem);
+          padding: 1px 3px;
+          bottom: 2px;
+          right: 3px;
+        }
+        .attacker-pos {
+          font-size: clamp(0.4rem, 2vmin, 0.8rem);
+          top: 2px;
+          left: 3px;
+        }
+        .timer-display {
+          position: fixed;
+          left: 50%;
+          transform: translateX(-50%);
+          padding: 4px 15px;
+          border-width: 1px;
+          z-index: 50;
+          background: var(--bg-dark);
+        }
+        .timer-display.black-timer {
+          top: 32px;
+        }
+        .timer-display.white-timer {
+          bottom: 8px;
+        }
+        .timer-label {
+          font-size: 0.5rem;
+        }
+        .timer-value {
+          font-size: 0.9rem;
+        }
+        /* Mobile turn info między zegarami */
+        .mobile-turn-info {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 8px 20px;
+          background: var(--bg-medium);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 5px;
+          margin: 5px 0;
+        }
+        .mobile-turn-player {
+          font-family: "Orbitron", monospace;
+          font-size: 1rem;
+          font-weight: bold;
+          color: var(--accent-cyan);
+          letter-spacing: 2px;
+        }
+        .mobile-turn-player.white-turn {
+          color: var(--white-piece);
+        }
+        .mobile-turn-player.black-turn {
+          color: var(--accent-magenta);
+        }
+        .mobile-turn-moves {
+          font-size: 0.75rem;
+          color: var(--text-secondary);
+          margin-top: 2px;
+        }
+        .modal {
+          padding: 25px;
+          max-width: 300px;
+        }
+        .modal h2 {
+          font-size: 1.4rem;
+        }
+        .modal p {
+          font-size: 1rem;
+          margin-bottom: 15px;
+        }
+        .modal-btn {
+          padding: 12px 30px;
+          font-size: 0.9rem;
+        }
+      }
+      @media (max-height: 700px) and (min-width: 901px) {
+        .board {
+          width: min(55vh, 450px);
+          height: min(55vh, 450px);
+        }
+        header {
+          padding: 5px 0;
+        }
+        h1 {
+          font-size: 1.5rem;
+        }
+        nav {
+          padding: 5px 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bg-pattern"></div>
+    <div class="container">
+      <div class="profile-bar">
+        <div
+          class="profile-name no-profile"
+          id="profile-display"
+          onclick="showProfileScreen()"
+        >
+          ⚙ Ustaw profil
+        </div>
+      </div>
+      <header>
+        <h1>Strzałkowe Szachy</h1>
+        <p class="subtitle">Strategia • Planowanie • Taktyka</p>
+      </header>
+      <nav>
+        <button class="nav-btn active" data-screen="menu">Menu</button>
+        <button class="nav-btn" data-screen="game">Gra</button>
+        <button class="nav-btn" data-screen="rules">Zasady</button>
+      </nav>
+
+      <!-- Ekran profilu -->
+      <div class="screen profile-screen" id="profile-screen">
+        <div class="profile-form">
+          <h2>🎮 Twój Profil</h2>
+          <p style="color: var(--text-secondary); margin-bottom: 15px">
+            Ustaw nazwę aby grać online
+          </p>
+          <input
+            type="text"
+            id="profile-name-input"
+            placeholder="Wpisz nazwę gracza..."
+            maxlength="20"
+          />
+          <button class="save-btn" onclick="saveProfile()">Zapisz</button>
+          <button
+            class="leave-lobby-btn"
+            onclick="showScreen('menu')"
+            style="margin-left: 10px"
+          >
+            Anuluj
+          </button>
+        </div>
+      </div>
+
+      <!-- Ekran Lobby -->
+      <div class="screen lobby-screen" id="lobby-screen">
+        <div class="lobby-box">
+          <h2>🌐 Lobby Online</h2>
+          <a class="lobby-link" id="lobby-link" href="#" target="_blank"
+            >Generowanie linku...</a
+          >
+          <button class="lobby-link-copy" onclick="copyLobbyLink()">
+            📋 Kopiuj link
+          </button>
+          <div class="lobby-players">
+            <h3>Gracze (1/2)</h3>
+            <div class="player-slot" id="player1-slot">
+              <span class="player-name" id="player1-name">Host</span>
+              <span class="player-status">👑 Host</span>
+            </div>
+            <div class="player-slot empty" id="player2-slot">
+              <span class="player-name">Oczekiwanie...</span>
+              <span class="player-status">⏳</span>
+            </div>
+          </div>
+          <p class="waiting-text" id="waiting-text">
+            Czekam na drugiego gracza...
+          </p>
+          <button
+            class="start-game-btn"
+            id="start-online-btn"
+            disabled
+            onclick="startOnlineGame()"
+          >
+            ▶ Rozpocznij Grę
+          </button>
+          <br />
+          <button class="leave-lobby-btn" onclick="leaveLobby()">
+            ✖ Opuść Lobby
+          </button>
+        </div>
+      </div>
+
+      <div class="screen menu-screen active" id="menu-screen">
+        <h2 class="menu-title">Wybierz Tryb Gry</h2>
+        <div class="game-modes">
+          <div class="mode-card" data-mode="pvp">
+            <div class="mode-icon">⚔️</div>
+            <div class="mode-name">Gracz vs Gracz</div>
+            <div class="mode-desc">
+              Graj z przyjacielem na jednym urządzeniu.
+            </div>
+          </div>
+          <div class="mode-card" data-mode="bot">
+            <div class="mode-icon">🤖</div>
+            <div class="mode-name">Gracz vs Bot</div>
+            <div class="mode-desc">Zmierz się z komputerem.</div>
+          </div>
+          <div class="mode-card" data-mode="online">
+            <div class="mode-icon">🌐</div>
+            <div class="mode-name">Online</div>
+            <div class="mode-desc">Stwórz lobby i graj przez internet.</div>
+          </div>
+        </div>
+        <div
+          class="difficulty-select"
+          id="difficulty-select"
+          style="display: none"
+        >
+          <h3>Wybierz Poziom Trudności</h3>
+          <div class="difficulty-btns">
+            <button class="diff-btn easy" data-diff="easy">Łatwy</button>
+            <button class="diff-btn medium" data-diff="medium">Średni</button>
+            <button class="diff-btn hard" data-diff="hard">Trudny</button>
+          </div>
+        </div>
+        <div class="time-select" id="time-select" style="display: none">
+          <h3>Czas na grę</h3>
+          <div class="time-btns">
+            <button class="time-btn" data-time="0">∞ Bez limitu</button>
+            <button class="time-btn" data-time="1">1 min</button>
+            <button class="time-btn" data-time="3">3 min</button>
+            <button class="time-btn" data-time="5">5 min</button>
+            <button class="time-btn" data-time="10">10 min</button>
+            <button class="time-btn" data-time="15">15 min</button>
+          </div>
+          <div
+            class="increment-select"
+            id="increment-select"
+            style="display: none"
+          >
+            <h4>Bonus po ruchu</h4>
+            <div class="increment-btns">
+              <button class="inc-btn" data-inc="0">+0s</button>
+              <button class="inc-btn" data-inc="1">+1s</button>
+              <button class="inc-btn" data-inc="2">+2s</button>
+              <button class="inc-btn" data-inc="3">+3s</button>
+              <button class="inc-btn" data-inc="5">+5s</button>
+              <button class="inc-btn" data-inc="10">+10s</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="screen" id="game-screen">
+        <div class="game-layout">
+          <div class="side-panel">
+            <div class="turn-indicator white-turn" id="turn-indicator">
+              <div class="turn-label">TURA</div>
+              <div class="turn-player" id="current-player">BIAŁE</div>
+            </div>
+            <div
+              class="move-info-panel"
+              id="move-info-panel"
+              style="display: none"
+            >
+              <div class="piece-name" id="selected-piece-name">-</div>
+              <div>
+                Pozostało kroków:
+                <span class="moves-left" id="moves-left">0</span>
+              </div>
+            </div>
+            <div style="margin-top: 20px">
+              <div class="panel-title">Zbite przez Białe</div>
+              <div class="captured-pieces" id="white-captured"></div>
+            </div>
+            <div style="margin-top: 20px">
+              <div class="panel-title">Zbite przez Czarne</div>
+              <div class="captured-pieces" id="black-captured"></div>
+            </div>
+            <div
+              class="pending-captures"
+              id="pending-captures"
+              style="display: none"
+            >
+              <div class="pending-title">⚠️ Aktywne Blokady</div>
+              <div id="pending-list"></div>
+            </div>
+          </div>
+          <div class="game-board-container">
+            <div class="timer-display black-timer" id="black-timer">
+              <span class="timer-label">CZARNE</span>
+              <span class="timer-value" id="black-time">∞</span>
+            </div>
+            <div class="mobile-turn-info" id="mobile-turn-info">
+              <div class="mobile-turn-player" id="mobile-turn-player">
+                BIAŁE
+              </div>
+              <div class="mobile-turn-moves" id="mobile-turn-moves"></div>
+            </div>
+            <div class="board-wrapper" id="board-wrapper">
+              <div class="board-labels board-label-top">
+                <span>a</span><span>b</span><span>c</span><span>d</span
+                ><span>e</span><span>f</span><span>g</span><span>h</span>
+              </div>
+              <div class="board-labels board-label-bottom">
+                <span>a</span><span>b</span><span>c</span><span>d</span
+                ><span>e</span><span>f</span><span>g</span><span>h</span>
+              </div>
+              <div class="board-labels board-label-left">
+                <span>8</span><span>7</span><span>6</span><span>5</span
+                ><span>4</span><span>3</span><span>2</span><span>1</span>
+              </div>
+              <div class="board-labels board-label-right">
+                <span>8</span><span>7</span><span>6</span><span>5</span
+                ><span>4</span><span>3</span><span>2</span><span>1</span>
+              </div>
+              <div class="board" id="board"></div>
+            </div>
+            <div class="timer-display white-timer" id="white-timer">
+              <span class="timer-label">BIAŁE</span>
+              <span class="timer-value" id="white-time">∞</span>
+            </div>
+          </div>
+          <div class="side-panel">
+            <div class="panel-title">Historia Ruchów</div>
+            <div class="move-log" id="move-log"></div>
+            <div class="legend">
+              <div class="legend-title">STREFY SZACHOWNICY</div>
+              <div class="legend-item">
+                <div class="legend-color center"></div>
+                Centrum
+              </div>
+              <div class="legend-item">
+                <div class="legend-color nexus-white"></div>
+                Skrzydło Nexusa (Białe)
+              </div>
+              <div class="legend-item">
+                <div class="legend-color phantom-white"></div>
+                Skrzydło Phantoma (Białe)
+              </div>
+              <div class="legend-item">
+                <div class="legend-color nexus-black"></div>
+                Skrzydło Nexusa (Czarne)
+              </div>
+              <div class="legend-item">
+                <div class="legend-color phantom-black"></div>
+                Skrzydło Phantoma (Czarne)
+              </div>
+              <div class="zone-toggle">
+                <label
+                  ><input type="checkbox" id="show-zones" checked /> Pokaż
+                  strefy</label
+                >
+              </div>
+            </div>
+            <div
+              class="analysis-controls"
+              id="analysis-controls"
+              style="display: none"
+            >
+              <div class="panel-title">📊 ANALIZA</div>
+              <div class="state-info" id="state-info">-</div>
+              <div class="analysis-btns">
+                <button class="analysis-btn" id="btn-first">⏮</button>
+                <button class="analysis-btn" id="btn-prev">◀</button>
+                <button class="analysis-btn" id="btn-next">▶</button>
+                <button class="analysis-btn" id="btn-last">⏭</button>
+              </div>
+              <div class="whatif-panel" id="whatif-panel" style="display: none">
+                <div class="whatif-info">
+                  🔬 Tryb "Co jeśli?" - testuj alternatywne ruchy
+                </div>
+                <div class="whatif-counter">
+                  Rundy: <span id="whatif-rounds">0</span>/3
+                </div>
+                <button
+                  class="analysis-btn reset-btn"
+                  id="btn-reset-whatif"
+                  style="margin-top: 10px"
+                >
+                  ↺ Resetuj
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="screen rules-screen" id="rules-screen">
+        <div class="rules-section">
+          <h2>◈ 1. Wprowadzenie do Gry</h2>
+          <p>
+            <strong>Strzałkowe Szachy</strong> to turowa gra strategiczna dla
+            dwóch graczy. Jest inspirowana klasycznymi szachami, ale posiada
+            całkowicie unikalne zasady ruchu i zbijania.
+          </p>
+
+          <h3>1.1. Cel gry</h3>
+          <div class="highlight-box">
+            <p>
+              Twoim celem jest <strong>zamatowanie</strong> wrogiego Nexusa (◆).
+              Mat następuje, gdy zablokujesz Nexusa przeciwnika i nie ma on
+              żadnego bezpiecznego pola, na które mógłby uciec.
+            </p>
+          </div>
+
+          <h3>1.2. Gracze i kolory</h3>
+          <p>
+            W grze biorą udział dwaj gracze: <strong>Białe</strong> i
+            <strong>Czarne</strong>.
+          </p>
+          <p>
+            Białe zawsze wykonują pierwszy ruch. Potem gracze ruszają się na
+            przemian.
+          </p>
+
+          <h3>1.3. Czym ta gra różni się od szachów?</h3>
+          <div class="warning-box">
+            <p><strong>Kluczowe różnice:</strong></p>
+            <p>
+              • Figury poruszają się krokami (nie skokami przez całą planszę)
+            </p>
+            <p>• Można wykonać tylko 1 krok po skosie na turę</p>
+            <p>
+              • Nie ma natychmiastowego zbijania – używamy systemu blokowania
+            </p>
+            <p>• Zablokowana figura ma czas na ucieczkę</p>
+            <p>• Atakujący nie może się ruszyć dopóki blokada trwa</p>
+          </div>
+        </div>
+
+        <div class="rules-section">
+          <h2>◈ 2. Szachownica</h2>
+
+          <h3>2.1. Wymiary i oznaczenia</h3>
+          <p>
+            Gra toczy się na planszy <strong>8×8 pól</strong> (64 pola łącznie).
+          </p>
+          <p>
+            <strong>Kolumny</strong> oznaczone są literami od
+            <strong>a</strong> do <strong>h</strong> (od lewej do prawej).
+          </p>
+          <p>
+            <strong>Rzędy</strong> oznaczone są cyframi od <strong>1</strong> do
+            <strong>8</strong> (od dołu do góry).
+          </p>
+          <p>
+            Każde pole ma unikalny adres, np. <strong>e4</strong> (kolumna e,
+            rząd 4).
+          </p>
+
+          <h3>2.2. Kolory pól</h3>
+          <p>
+            Pola na szachownicy mają naprzemienne kolory (jasne i ciemne), co
+            ułatwia orientację.
+          </p>
+
+          <h3>2.3. Strefy strategiczne</h3>
+          <p>
+            Szachownica podzielona jest na kolorowe strefy, które pomagają w
+            orientacji i planowaniu strategii:
+          </p>
+          <div class="highlight-box">
+            <p>
+              <strong>Centrum</strong> (żółte) – pola d4, d5, e4, e5. Kontrola
+              centrum daje przewagę taktyczną, bo figury w centrum mają
+              największy zasięg.
+            </p>
+            <p>
+              <strong>Skrzydło Nexusa Białych</strong> (niebieskie) – kolumny
+              e-h, rzędy 1-2. Tu zaczyna Nexus białych.
+            </p>
+            <p>
+              <strong>Skrzydło Phantoma Białych</strong> (zielone) – kolumny
+              a-d, rzędy 1-2. Tu zaczyna Phantom białych.
+            </p>
+            <p>
+              <strong>Skrzydło Nexusa Czarnych</strong> (czerwone) – kolumny
+              e-h, rzędy 7-8. Tu zaczyna Nexus czarnych.
+            </p>
+            <p>
+              <strong>Skrzydło Phantoma Czarnych</strong> (pomarańczowe) –
+              kolumny a-d, rzędy 7-8. Tu zaczyna Phantom czarnych.
+            </p>
+          </div>
+          <p>
+            Strefy można włączać/wyłączać w panelu bocznym podczas gry (na
+            komputerze).
+          </p>
+        </div>
+
+        <div class="rules-section">
+          <h2>◈ 3. Figury</h2>
+
+          <h3>3.1. Skład armii</h3>
+          <p>Każdy gracz rozpoczyna grę z <strong>16 figurami</strong>:</p>
+          <div class="highlight-box">
+            <p>• 1 × <strong>Nexus</strong> (◆) – najważniejsza figura</p>
+            <p>• 1 × <strong>Phantom</strong> (✧) – najpotężniejsza figura</p>
+            <p>
+              • 2 × <strong>Sentinel</strong> (◎) – porusza się tylko prosto
+            </p>
+            <p>
+              • 2 × <strong>Shade</strong> (◇) – porusza się tylko po skosie
+            </p>
+            <p>• 2 × <strong>Drifter</strong> (⬡) – wszechstronna figura</p>
+            <p>• 8 × <strong>Shard</strong> (▲) – pionki, mogą awansować</p>
+          </div>
+
+          <h3>3.2. Ustawienie początkowe</h3>
+          <p><strong>Białe</strong> (rzędy 1-2, na dole planszy):</p>
+          <div class="highlight-box">
+            <p>
+              <strong>Rząd 1 (od a1 do h1):</strong> Sentinel, Drifter, Shade,
+              Phantom, Nexus, Shade, Drifter, Sentinel
+            </p>
+            <p><strong>Rząd 2 (od a2 do h2):</strong> 8 × Shard (pionki)</p>
+          </div>
+          <p><strong>Czarne</strong> (rzędy 7-8, na górze planszy):</p>
+          <div class="highlight-box">
+            <p>
+              <strong>Rząd 8 (od a8 do h8):</strong> Sentinel, Drifter, Shade,
+              Phantom, Nexus, Shade, Drifter, Sentinel
+            </p>
+            <p><strong>Rząd 7 (od a7 do h7):</strong> 8 × Shard (pionki)</p>
+          </div>
+
+          <h3>3.3. Szczegółowy opis figur</h3>
+          <div class="piece-showcase">
+            <div class="piece-card">
+              <div class="piece-card-symbol">◆</div>
+              <div class="piece-card-info">
+                <h4>Nexus (◆) – Król</h4>
+                <p>
+                  <strong>Liczba kroków:</strong> 1 (dokładnie jeden krok na
+                  turę)<br />
+                  <strong>Dozwolone kierunki:</strong> Wszystkie 8 kierunków
+                  (góra, dół, lewo, prawo + 4 skosy)<br />
+                  <strong>Specjalne zasady:</strong><br />
+                  • To najważniejsza figura – jej utrata kończy grę!<br />
+                  • NIE MOŻE wchodzić na pola zagrożone przez wroga<br />
+                  • Gdy jest zablokowany (szach), ma tylko 1 turę na ucieczkę<br />
+                  • Brak możliwości ucieczki = MAT (przegrana)
+                </p>
+              </div>
+            </div>
+            <div class="piece-card">
+              <div class="piece-card-symbol">✧</div>
+              <div class="piece-card-info">
+                <h4>Phantom (✧) – Hetman</h4>
+                <p>
+                  <strong>Liczba kroków:</strong> do 5 (możesz użyć 1, 2, 3, 4
+                  lub 5 kroków, ale musisz użyć wszystkich jeśli nie
+                  atakujesz)<br />
+                  <strong>Dozwolone kierunki:</strong> Wszystkie 8 kierunków<br />
+                  <strong>Specjalne zasady:</strong><br />
+                  • Najpotężniejsza figura ofensywna w grze<br />
+                  • Duży zasięg pozwala na szybkie ataki z daleka<br />
+                  • Pamiętaj o zasadzie 1 skosu na turę!
+                </p>
+              </div>
+            </div>
+            <div class="piece-card">
+              <div class="piece-card-symbol">◎</div>
+              <div class="piece-card-info">
+                <h4>Sentinel (◎) – Wieża</h4>
+                <p>
+                  <strong>Liczba kroków:</strong> do 4<br />
+                  <strong>Dozwolone kierunki:</strong> Tylko 4 kierunki proste
+                  (góra, dół, lewo, prawo)<br />
+                  <strong>Specjalne zasady:</strong><br />
+                  • NIE MOŻE poruszać się po skosie w ogóle<br />
+                  • Idealny do kontrolowania linii poziomych i pionowych<br />
+                  • Silny w otwartej grze (gdy ścieżki są wolne)
+                </p>
+              </div>
+            </div>
+            <div class="piece-card">
+              <div class="piece-card-symbol">◇</div>
+              <div class="piece-card-info">
+                <h4>Shade (◇) – Goniec</h4>
+                <p>
+                  <strong>Liczba kroków:</strong> do 4<br />
+                  <strong>Dozwolone kierunki:</strong> Tylko 4 kierunki
+                  skośne<br />
+                  <strong>Specjalne zasady:</strong><br />
+                  • NIE MOŻE poruszać się prosto w ogóle<br />
+                  • Kontroluje przekątne planszy<br />
+                  • Każdy gracz ma 2 Shade'y – jeden na jasnych polach, jeden na
+                  ciemnych
+                </p>
+              </div>
+            </div>
+            <div class="piece-card">
+              <div class="piece-card-symbol">⬡</div>
+              <div class="piece-card-info">
+                <h4>Drifter (⬡) – Skoczek</h4>
+                <p>
+                  <strong>Liczba kroków:</strong> do 3<br />
+                  <strong>Dozwolone kierunki:</strong> Wszystkie 8 kierunków<br />
+                  <strong>Specjalne zasady:</strong><br />
+                  • Wszechstronna figura średniego zasięgu<br />
+                  • Może łączyć kroki proste i skośne (pamiętaj: max 1 skos na
+                  turę!)<br />
+                  • Dobry do szybkiego reagowania na zagrożenia
+                </p>
+              </div>
+            </div>
+            <div class="piece-card">
+              <div class="piece-card-symbol">▲</div>
+              <div class="piece-card-info">
+                <h4>Shard (▲) – Pionek</h4>
+                <p>
+                  <strong>Liczba kroków:</strong> 1 (dokładnie jeden krok)<br />
+                  <strong>Kierunki RUCHU:</strong> Tylko do przodu (prosto) –
+                  białe idą w górę, czarne w dół<br />
+                  <strong>Kierunki ATAKU:</strong> Tylko po skosie do przodu (2
+                  kierunki)<br />
+                  <strong>Specjalne zasady:</strong><br />
+                  • Jedyna figura z RÓŻNYMI kierunkami ruchu i ataku!<br />
+                  • Nie może cofać się ani atakować prosto<br />
+                  • Może awansować na Phantoma (patrz: sekcja Promocja)
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rules-section">
+          <h2>◈ 4. Zasady Ruchu</h2>
+
+          <h3>4.1. Kolejność ruchów</h3>
+          <p>
+            Gracze wykonują ruchy <strong>na przemian</strong>. Białe zawsze
+            zaczynają.
+          </p>
+          <p>
+            W każdej turze gracz musi wykonać dokładnie
+            <strong>jeden ruch</strong> jedną figurą.
+          </p>
+          <p>Nie można pominąć ruchu (poza sytuacją pata).</p>
+
+          <h3>4.2. Jak wykonać ruch</h3>
+          <div class="highlight-box">
+            <p>
+              <strong>Krok 1:</strong> Kliknij figurę, którą chcesz ruszyć. Pole
+              figury podświetli się na niebiesko.
+            </p>
+            <p>
+              <strong>Krok 2:</strong> Kliknij kolejne pola, tworząc ścieżkę.
+              Żółte strzałki pokazują zaplanowaną trasę.
+            </p>
+            <p>
+              <strong>Krok 3:</strong> Ruch wykonuje się automatycznie gdy
+              wykorzystasz wszystkie kroki LUB gdy zaatakujesz wroga.
+            </p>
+            <p>
+              <strong>Anulowanie:</strong> Kliknij ponownie na wybraną figurę
+              (gdy ścieżka jest pusta) aby ją odznaczyć.
+            </p>
+          </div>
+
+          <h3>4.3. Obowiązkowe wykorzystanie WSZYSTKICH kroków</h3>
+          <div class="warning-box">
+            <p>
+              <strong>BARDZO WAŻNE:</strong> Musisz wykorzystać WSZYSTKIE kroki
+              figury! Nie możesz zakończyć ruchu wcześniej.
+            </p>
+            <p>
+              <strong>Przykład:</strong> Phantom ma 5 kroków. MUSISZ wykonać
+              wszystkie 5 kroków.
+            </p>
+            <p>
+              <strong>Jedyny wyjątek:</strong> Gdy w trakcie ruchu zaatakujesz
+              wrogą figurę – wtedy ruch kończy się automatycznie w momencie
+              ataku.
+            </p>
+          </div>
+          <p>
+            <strong>Przykład z atakiem:</strong> Phantom (5 kroków) idzie: krok
+            1 → krok 2 → krok 3 (trafia na wroga) → KONIEC RUCHU. Kroki 4 i 5
+            nie są wykonywane.
+          </p>
+
+          <h3>4.4. Zasada JEDNEGO SKOSU na turę</h3>
+          <div class="warning-box">
+            <p>
+              <strong>KLUCZOWA ZASADA:</strong> W jednej turze możesz wykonać
+              <strong>maksymalnie JEDEN krok po skosie</strong> (ukośnie).
+            </p>
+            <p>
+              Po wykonaniu kroku po skosie, wszystkie pozostałe kroki w tej
+              turze muszą być <strong>proste</strong> (góra/dół/lewo/prawo).
+            </p>
+          </div>
+          <p><strong>Przykłady dla Phantoma (5 kroków):</strong></p>
+          <div class="highlight-box">
+            <p>✅ DOZWOLONE: prosto → prosto → skos → prosto → prosto</p>
+            <p>✅ DOZWOLONE: skos → prosto → prosto → prosto → prosto</p>
+            <p>✅ DOZWOLONE: prosto → prosto → prosto → prosto → skos</p>
+            <p>❌ ZABRONIONE: skos → skos → prosto → prosto → prosto</p>
+            <p>❌ ZABRONIONE: prosto → skos → prosto → skos → prosto</p>
+          </div>
+
+          <h3>4.5. Blokowanie ścieżki</h3>
+          <p>
+            Figura <strong>nie może przechodzić przez pola zajęte</strong> przez
+            inne figury (zarówno własne jak i wrogie).
+          </p>
+          <p>Musisz omijać przeszkody, planując ścieżkę dookoła nich.</p>
+          <p>
+            <strong>Wyjątek:</strong> Możesz zakończyć ruch na polu wroga (atak)
+            – ale to musi być twój ostatni krok!
+          </p>
+
+          <h3>4.6. Kiedy ruch się kończy</h3>
+          <p>Ruch kończy się automatycznie w jednej z dwóch sytuacji:</p>
+          <div class="highlight-box">
+            <p>
+              <strong>1.</strong> Wykorzystałeś wszystkie dostępne kroki figury
+              (obowiązkowe!)
+            </p>
+            <p>
+              <strong>2.</strong> Wszedłeś na pole z wrogą figurą (atak) – to
+              jedyny sposób na skrócenie ruchu
+            </p>
+          </div>
+        </div>
+
+        <div class="rules-section">
+          <h2>◈ 5. System Ataku i Zbijania</h2>
+          <p>
+            W Strzałkowych Szachach
+            <strong>nie ma natychmiastowego zbijania</strong> jak w klasycznych
+            szachach!
+          </p>
+          <p>
+            Zamiast tego używamy systemu <strong>blokowania</strong>, który daje
+            ofierze szansę na ucieczkę.
+          </p>
+
+          <h3>5.1. Jak zaatakować wrogą figurę</h3>
+          <p>
+            Aby zaatakować, musisz
+            <strong>wejść na pole zajmowane przez wrogą figurę</strong> podczas
+            swojego ruchu.
+          </p>
+          <div class="warning-box">
+            <p>
+              <strong>KRYTYCZNA ZASADA:</strong> Atak MUSI być
+              <strong>ostatnim krokiem</strong> twojego ruchu!
+            </p>
+            <p>
+              Nie możesz "przejść przez" wrogą figurę ani zaatakować "po drodze"
+              i kontynuować dalej.
+            </p>
+            <p>
+              Gdy wejdziesz na pole wroga, twój ruch natychmiast się kończy.
+            </p>
+          </div>
+          <p>
+            <strong>Przykład:</strong> Phantom (5 kroków) może zaatakować w
+            kroku 1, 2, 3, 4 lub 5 – ale w momencie ataku ruch się kończy,
+            niezależnie ile kroków zostało.
+          </p>
+
+          <h3>5.2. Co się dzieje po ataku – krok po kroku</h3>
+          <div class="highlight-box">
+            <p>
+              <strong>Krok 1:</strong> Twoja figura (atakujący) ZOSTAJE na swoim
+              ostatnim polu PRZED polem ofiary – NIE wchodzi na pole ofiary!
+            </p>
+            <p>
+              <strong>Krok 2:</strong> Na polu ofiary pojawia się pulsująca
+              strzałka wskazująca kierunek ataku.
+            </p>
+            <p>
+              <strong>Krok 3:</strong> Na polu ofiary pojawia się licznik tur
+              pokazujący ile czasu zostało na ucieczkę.
+            </p>
+            <p>
+              <strong>Krok 4:</strong> Ofiara jest teraz "zablokowana" – musi
+              próbować uciec w swoich następnych turach.
+            </p>
+            <p><strong>Krok 5:</strong> Tura przechodzi na przeciwnika.</p>
+          </div>
+
+          <h3>5.3. Zasady dla ATAKUJĄCEGO (twojej figury)</h3>
+          <div class="warning-box">
+            <p>Figura która atakuje (blokuje inną figurę):</p>
+            <p>
+              • <strong>NIE MOŻE SIĘ RUSZYĆ</strong> dopóki blokada nie zostanie
+              rozwiązana!
+            </p>
+            <p>• Jest wizualnie przyciemniona na planszy</p>
+            <p>• Nie można jej wybrać do ruchu</p>
+            <p>
+              • Musi czekać na swoim polu aż ofiara ucieknie LUB zostanie zbita
+            </p>
+            <p>
+              • Jeśli w tym czasie INNA twoja figura zablokuje atakującego – on
+              też musi uciekać!
+            </p>
+          </div>
+
+          <h3>5.4. Zasady dla ZABLOKOWANEJ figury (ofiary)</h3>
+          <div class="warning-box">
+            <p>Figura która jest atakowana (zablokowana):</p>
+            <p>
+              • <strong>MOŻE</strong> uciekać na dowolne puste pole w zasięgu
+              swoich normalnych kroków
+            </p>
+            <p>
+              • <strong>MUSI</strong> przestrzegać wszystkich normalnych zasad
+              ruchu (w tym zasady 1 skosu)
+            </p>
+            <p>
+              • <strong>NIE MOŻE</strong> atakować innych figur podczas ucieczki
+              – tylko puste pola!
+            </p>
+            <p>
+              • <strong>NIE MOŻE</strong> zaatakować atakującego – nie da się
+              "odbić"!
+            </p>
+            <p>• Ma ograniczony czas na ucieczkę (patrz: licznik tur)</p>
+          </div>
+
+          <h3>5.5. Czas na ucieczkę – licznik tur</h3>
+          <p>
+            <strong>Zwykłe figury</strong> (Phantom, Sentinel, Shade, Drifter,
+            Shard):
+          </p>
+          <div class="highlight-box">
+            <p>Mają <strong>2 tury</strong> na ucieczkę.</p>
+            <p>
+              Licznik: <strong>2</strong> (po ataku) → <strong>1</strong> (po
+              turze wroga) → <strong>ZBICIE</strong> (jeśli nie uciekł)
+            </p>
+          </div>
+          <p><strong>Nexus</strong> (◆):</p>
+          <div class="warning-box">
+            <p>Ma tylko <strong>1 turę</strong> na ucieczkę!</p>
+            <p>
+              Licznik: <strong>1</strong> (po ataku) →
+              <strong>ZBICIE/MAT</strong> (jeśli nie uciekł)
+            </p>
+            <p>
+              Jeśli Nexus nie może uciec (wszystkie pola zablokowane/zagrożone)
+              = natychmiastowy MAT!
+            </p>
+          </div>
+
+          <h3>5.6. Jak kończy się blokada – dwa scenariusze</h3>
+          <div class="highlight-box">
+            <p><strong>SCENARIUSZ A – Ucieczka (ofiara ucieka):</strong></p>
+            <p>1. Ofiara wykonuje legalny ruch na puste pole</p>
+            <p>2. Blokada zostaje anulowana</p>
+            <p>
+              3. Atakujący pozostaje na swoim polu (nie zajmuje pola ofiary!)
+            </p>
+            <p>
+              4. Atakujący może normalnie się ruszyć w swojej następnej turze
+            </p>
+          </div>
+          <div class="warning-box">
+            <p><strong>SCENARIUSZ B – Zbicie (ofiara nie uciekła):</strong></p>
+            <p>1. Licznik tur spada do 0</p>
+            <p>2. Ofiara zostaje ZBITA i usunięta z planszy na stałe</p>
+            <p>3. Atakujący automatycznie zajmuje pole, gdzie stała ofiara</p>
+            <p>4. Zbita figura trafia do panelu "Zbite figury"</p>
+          </div>
+
+          <h3>5.7. Wiele blokad jednocześnie</h3>
+          <p>
+            Na planszy może istnieć
+            <strong>wiele aktywnych blokad</strong> jednocześnie!
+          </p>
+          <p>Każda blokada jest niezależna i ma własny licznik tur.</p>
+          <p>
+            Gracz może mieć kilka figur atakujących (wszystkie będą zablokowane)
+            i kilka figur uciekających.
+          </p>
+
+          <h3>5.8. Zbite figury</h3>
+          <p>
+            Zbite figury są usuwane z planszy <strong>na stałe</strong> – nie
+            wracają do gry.
+          </p>
+          <p>
+            Na komputerze widać je w panelu bocznym ("Zbite przez Białe" /
+            "Zbite przez Czarne").
+          </p>
+        </div>
+
+        <div class="rules-section">
+          <h2>◈ 6. Nexus – Zasady Specjalne</h2>
+          <p>
+            Nexus (◆) to <strong>najważniejsza figura</strong> w grze. Jego
+            utrata oznacza natychmiastową przegraną.
+          </p>
+
+          <h3>6.1. Atakowanie Nexusa</h3>
+          <p>
+            Atak na Nexusa działa <strong>tak samo</strong> jak atak na każdą
+            inną figurę:
+          </p>
+          <div class="highlight-box">
+            <p>
+              • Musisz wejść na pole Nexusa jako
+              <strong>ostatni krok</strong> swojego ruchu
+            </p>
+            <p>
+              • Nie możesz "złapać" Nexusa po drodze – musi to być twój końcowy
+              cel
+            </p>
+            <p>• Atakujący zostaje na swoim polu, Nexus jest zablokowany</p>
+          </div>
+          <div class="warning-box">
+            <p>
+              <strong>RÓŻNICA:</strong> Nexus ma tylko
+              <strong>1 turę</strong> na ucieczkę (nie 2 jak inne figury)!
+            </p>
+          </div>
+
+          <h3>6.2. Szach</h3>
+          <p>
+            Gdy wróg zablokuje twojego Nexusa, jesteś w stanie
+            <strong>SZACH</strong>.
+          </p>
+          <p>Nexus pulsuje na czerwono, sygnalizując zagrożenie.</p>
+          <p>
+            Nexus <strong>MUSI</strong> uciec w swojej następnej turze – nie
+            możesz ruszyć żadną inną figurą!
+          </p>
+
+          <h3>6.3. Ograniczenia ruchu Nexusa</h3>
+          <div class="warning-box">
+            <p>
+              Nexus <strong>NIE MOŻE</strong> wejść na pole, które jest
+              <strong>zagrożone</strong> przez jakąkolwiek wrogą figurę.
+            </p>
+            <p>
+              Pole jest "zagrożone" jeśli wróg mógłby na nie dotrzeć jako
+              ostatni krok swojego ruchu.
+            </p>
+            <p>
+              To oznacza, że Nexus musi zawsze uciekać na "bezpieczne" pola.
+            </p>
+          </div>
+
+          <h3>6.4. Mat – koniec gry</h3>
+          <p><strong>MAT</strong> następuje gdy:</p>
+          <div class="warning-box">
+            <p>• Nexus jest zablokowany (w szachu) ORAZ</p>
+            <p>• Nie ma żadnego bezpiecznego pola do ucieczki:</p>
+            <p>– Wszystkie sąsiednie pola są zajęte przez własne figury, LUB</p>
+            <p>– Wszystkie sąsiednie pola są zagrożone przez wroga, LUB</p>
+            <p>– Wszystkie sąsiednie pola są poza planszą</p>
+          </div>
+          <p>Mat kończy grę natychmiast – wygrywa gracz, który zamatował.</p>
+        </div>
+
+        <div class="rules-section">
+          <h2>◈ 7. Promocja Sharda</h2>
+
+          <h3>7.1. Warunek promocji</h3>
+          <p>
+            Gdy Shard (▲) dotrze do <strong>ostatniego rzędu</strong> planszy,
+            automatycznie awansuje na <strong>Phantoma</strong> (✧).
+          </p>
+          <div class="highlight-box">
+            <p>
+              <strong>Dla Białych:</strong> Ostatni rząd to rząd 8 (górna
+              krawędź planszy)
+            </p>
+            <p>
+              <strong>Dla Czarnych:</strong> Ostatni rząd to rząd 1 (dolna
+              krawędź planszy)
+            </p>
+          </div>
+
+          <h3>7.2. Jak działa promocja</h3>
+          <p>
+            Promocja następuje <strong>natychmiast</strong> po dotarciu Sharda
+            na ostatni rząd.
+          </p>
+          <p>
+            Shard zamienia się w Phantoma (z 5 krokami i wszystkimi kierunkami).
+          </p>
+          <p>Nowy Phantom może być użyty <strong>od następnej tury</strong>.</p>
+
+          <h3>7.3. Strategia</h3>
+          <p>
+            Promocja to potężne narzędzie! Shard wart 1 krok zamienia się w
+            Phantoma wart 5 kroków.
+          </p>
+          <p>
+            Chroń swoje Shardy i prowadź je do promocji, jednocześnie blokując
+            Shardy przeciwnika.
+          </p>
+        </div>
+
+        <div class="rules-section">
+          <h2>◈ 8. Koniec Gry</h2>
+
+          <h3>8.1. Zwycięstwo przez Mat</h3>
+          <p>Gracz wygrywa gdy <strong>zamatuje</strong> wrogiego Nexusa.</p>
+          <p>
+            Mat = Nexus jest zablokowany + nie ma bezpiecznego pola do ucieczki.
+          </p>
+
+          <h3>8.2. Remis przez Pat</h3>
+          <p><strong>PAT</strong> następuje gdy:</p>
+          <div class="highlight-box">
+            <p>
+              • Gracz nie ma żadnego legalnego ruchu (żadna figura nie może się
+              ruszyć), ALE
+            </p>
+            <p>• Jego Nexus NIE jest zablokowany (nie jest w szachu)</p>
+          </div>
+          <p>Pat kończy grę <strong>remisem</strong> – nikt nie wygrywa.</p>
+
+          <h3>8.3. Przegrana na czas</h3>
+          <p>
+            W grze z limitem czasu, gracz którego zegar spadnie do
+            <strong>0:00</strong> natychmiast przegrywa.
+          </p>
+          <p>Nie ma znaczenia pozycja na planszy – brak czasu = przegrana.</p>
+        </div>
+
+        <div class="rules-section">
+          <h2>◈ 9. Ustawienia Gry</h2>
+
+          <h3>9.1. Tryby gry</h3>
+          <p><strong>Gracz vs Gracz (PvP):</strong></p>
+          <p>
+            Dwóch graczy gra na jednym urządzeniu, na przemian. Na telefonie
+            plansza obraca się automatycznie przy zmianie tury.
+          </p>
+          <p><strong>Gracz vs Bot:</strong></p>
+          <p>
+            Grasz jako Białe przeciwko komputerowi (Czarne). Dostępne 3 poziomy
+            trudności:
+          </p>
+          <div class="highlight-box">
+            <p>
+              • <strong>Łatwy</strong> – Bot wykonuje losowe ruchy. Dobry do
+              nauki.
+            </p>
+            <p>
+              • <strong>Średni</strong> – Bot preferuje ataki i ucieczki. Wymaga
+              uwagi.
+            </p>
+            <p>
+              • <strong>Trudny</strong> – Bot analizuje wartość figur i pozycję.
+              Prawdziwe wyzwanie!
+            </p>
+          </div>
+
+          <h3>9.2. Kontrola czasu</h3>
+          <p><strong>Bez limitu (∞):</strong></p>
+          <p>
+            Gracze mają nieograniczony czas na ruchy. Idealne do nauki i
+            spokojnej gry.
+          </p>
+          <p><strong>Z limitem (1/3/5/10/15 minut):</strong></p>
+          <p>
+            Każdy gracz ma określony czas na całą grę. Zegar odlicza tylko
+            podczas twojej tury.
+          </p>
+
+          <h3>9.3. Bonus po ruchu (inkrement)</h3>
+          <p>
+            Po wykonaniu ruchu, do zegara gracza dodawana jest określona liczba
+            sekund.
+          </p>
+          <p>Dostępne opcje: +0s, +1s, +2s, +3s, +5s, +10s</p>
+          <p>
+            <strong>Przykład:</strong> Gra 5+3 oznacza: 5 minut na start + 3
+            sekundy po każdym ruchu.
+          </p>
+        </div>
+
+        <div class="rules-section">
+          <h2>◈ 10. Analiza Partii</h2>
+          <p>
+            Po zakończeniu gry (mat/pat/czas) możesz analizować przebieg całej
+            partii.
+          </p>
+
+          <h3>10.1. Przeglądanie historii</h3>
+          <p>
+            Na komputerze: Kliknij dowolny wpis w "Historii Ruchów" aby zobaczyć
+            planszę w tym momencie.
+          </p>
+          <p>Użyj przycisków nawigacji:</p>
+          <div class="highlight-box">
+            <p>⏮ – Idź do początku gry</p>
+            <p>◀ – Poprzedni ruch</p>
+            <p>▶ – Następny ruch</p>
+            <p>⏭ – Idź do końca gry</p>
+          </div>
+
+          <h3>10.2. Tryb "Co jeśli?"</h3>
+          <p>Podczas analizy możesz testować alternatywne ruchy:</p>
+          <div class="highlight-box">
+            <p>• Kliknij figurę i wykonaj ruch jak w normalnej grze</p>
+            <p>• Możesz wykonać maksymalnie <strong>3 rundy</strong> testowe</p>
+            <p>• Kliknij "↺ Resetuj" aby wrócić do oryginalnej pozycji</p>
+            <p>• Po 4 rundzie następuje automatyczny reset</p>
+          </div>
+        </div>
+
+        <div class="rules-section">
+          <h2>◈ 11. Interfejs Gry (komputer)</h2>
+
+          <h3>11.1. Oznaczenia na planszy</h3>
+          <div class="highlight-box">
+            <p>
+              <strong>Niebieskie pole:</strong> Wybrana figura (którą chcesz
+              ruszyć)
+            </p>
+            <p>
+              <strong>Zielone pola:</strong> Dostępne pola do następnego kroku
+            </p>
+            <p>
+              <strong>Żółte strzałki:</strong> Twoja zaplanowana ścieżka ruchu
+            </p>
+            <p>
+              <strong>Pulsujące strzałki:</strong> Aktywne blokady (ataki w
+              toku)
+            </p>
+            <p><strong>Licznik na polu:</strong> Ile tur zostało do zbicia</p>
+            <p>
+              <strong>Czerwone pulsowanie:</strong> Nexus w szachu (zagrożony!)
+            </p>
+            <p>
+              <strong>Przyciemniona figura:</strong> Figura która atakuje (nie
+              może się ruszyć)
+            </p>
+          </div>
+
+          <h3>11.2. Panele boczne</h3>
+          <p><strong>Lewy panel:</strong></p>
+          <p>• Wskaźnik tury (czyja kolej)</p>
+          <p>• Informacje o wybranej figurze i ile kroków zostało</p>
+          <p>• Zbite figury przez każdego gracza</p>
+          <p>• Lista aktywnych blokad</p>
+          <p><strong>Prawy panel:</strong></p>
+          <p>• Historia ruchów (klikalna podczas analizy)</p>
+          <p>• Legenda stref szachownicy</p>
+          <p>• Kontrolki analizy (po zakończeniu gry)</p>
+
+          <h3>11.3. Zegary</h3>
+          <p>
+            Zegar czarnych wyświetlany jest <strong>nad</strong> szachownicą.
+          </p>
+          <p>
+            Zegar białych wyświetlany jest <strong>pod</strong> szachownicą.
+          </p>
+          <p>
+            Aktywny zegar ma złotą ramkę. Gdy zostanie mniej niż 30 sekund,
+            zegar pulsuje na różowo.
+          </p>
+
+          <h3>11.4. Interfejs mobilny</h3>
+          <p>Na telefonie/tablecie interfejs jest uproszczony:</p>
+          <p>• Szachownica zajmuje cały ekran</p>
+          <p>• Zegary wyświetlane na górze i dole</p>
+          <p>• Między zegarami: info o turze i wybranej figurze</p>
+          <p>• W trybie PvP plansza obraca się przy zmianie tury</p>
+        </div>
+      </div>
+    </div>
+    <div class="modal-overlay" id="game-over-modal">
+      <div class="modal">
+        <h2 id="modal-title">Koniec Gry!</h2>
+        <p id="modal-message">Białe wygrywają!</p>
+        <button class="modal-btn" id="new-game-btn">Nowa Gra</button>
+      </div>
+    </div>
+    <script>
+      const PIECES = {
+        KING: { symbol: "◆", name: "Nexus", moves: 1, type: "king" },
+        QUEEN: { symbol: "✧", name: "Phantom", moves: 5, type: "queen" },
+        ROOK: {
+          symbol: "◎",
+          name: "Sentinel",
+          moves: 4,
+          type: "rook",
+          straightOnly: true,
+        },
+        BISHOP: {
+          symbol: "◇",
+          name: "Shade",
+          moves: 4,
+          type: "bishop",
+          diagonalOnly: true,
+        },
+        KNIGHT: { symbol: "⬡", name: "Drifter", moves: 3, type: "knight" },
+        PAWN: { symbol: "▲", name: "Shard", moves: 1, type: "pawn" },
+      };
+      const DIRECTIONS = {
+        n: { dx: 0, dy: -1, diagonal: false, arrow: "↑" },
+        s: { dx: 0, dy: 1, diagonal: false, arrow: "↓" },
+        e: { dx: 1, dy: 0, diagonal: false, arrow: "→" },
+        w: { dx: -1, dy: 0, diagonal: false, arrow: "←" },
+        ne: { dx: 1, dy: -1, diagonal: true, arrow: "↗" },
+        nw: { dx: -1, dy: -1, diagonal: true, arrow: "↖" },
+        se: { dx: 1, dy: 1, diagonal: true, arrow: "↘" },
+        sw: { dx: -1, dy: 1, diagonal: true, arrow: "↙" },
+      };
+      let G = {
+        board: [],
+        currentPlayer: "white",
+        selectedPiece: null,
+        plannedPath: [],
+        usedDiagonal: false,
+        gameMode: null,
+        difficulty: "medium",
+        pendingCaptures: [],
+        capturedByWhite: [],
+        capturedByBlack: [],
+        moveHistory: [],
+        gameOver: false,
+        inCheck: null,
+        showZones: true,
+        timeLimit: 0,
+        increment: 0,
+        whiteTime: 0,
+        blackTime: 0,
+        timerInterval: null,
+        gameStates: [],
+        currentStateIndex: -1,
+        analyzing: false,
+        whatIfMode: false,
+        whatIfBaseIndex: -1,
+        whatIfRounds: 0,
+        whatIfBoard: null,
+        whatIfPending: null,
+        whatIfCapturedW: null,
+        whatIfCapturedB: null,
+        whatIfPlayer: null,
+        isAnimating: false,
+      };
+
+      // Profil i Online
+      let playerProfile = localStorage.getItem("arrowChessProfile") || null;
+      let lobbyId = null;
+      let isHost = false;
+      let onlinePlayers = [];
+
+      // Inicjalizacja profilu
+      function initProfile() {
+        var display = document.getElementById("profile-display");
+        if (playerProfile) {
+          display.textContent = "👤 " + playerProfile;
+          display.classList.remove("no-profile");
+        } else {
+          display.textContent = "⚙ Ustaw profil";
+          display.classList.add("no-profile");
+        }
+      }
+
+      function showProfileScreen() {
+        showScreen("profile");
+        document.getElementById("profile-name-input").value =
+          playerProfile || "";
+      }
+
+      function saveProfile() {
+        var name = document.getElementById("profile-name-input").value.trim();
+        if (name.length < 2) {
+          alert("Nazwa musi mieć minimum 2 znaki!");
+          return;
+        }
+        playerProfile = name;
+        localStorage.setItem("arrowChessProfile", name);
+        initProfile();
+        showScreen("menu");
+      }
+
+      function showScreen(screenId) {
+        document
+          .querySelectorAll(".screen")
+          .forEach((s) => s.classList.remove("active"));
+        document.getElementById(screenId + "-screen").classList.add("active");
+        document
+          .querySelectorAll(".nav-btn")
+          .forEach((b) => b.classList.remove("active"));
+        var navBtn = document.querySelector('[data-screen="' + screenId + '"]');
+        if (navBtn) navBtn.classList.add("active");
+      }
+
+      // Online / Lobby
+      function createLobby() {
+        if (!playerProfile) {
+          showProfileScreen();
+          return;
+        }
+        lobbyId = generateLobbyId();
+        isHost = true;
+        onlinePlayers = [{ name: playerProfile, isHost: true }];
+        showScreen("lobby");
+        updateLobbyUI();
+      }
+
+      function generateLobbyId() {
+        return "LOBBY-" + Math.random().toString(36).substr(2, 8).toUpperCase();
+      }
+
+      function updateLobbyUI() {
+        var linkEl = document.getElementById("lobby-link");
+        var fullUrl =
+          window.location.origin +
+          window.location.pathname +
+          "?lobby=" +
+          lobbyId;
+        linkEl.textContent = fullUrl;
+        linkEl.href = fullUrl;
+
+        var player1 = document.getElementById("player1-slot");
+        var player1Name = document.getElementById("player1-name");
+        player1Name.textContent = onlinePlayers[0]
+          ? onlinePlayers[0].name
+          : "Oczekiwanie...";
+        player1.classList.toggle("empty", !onlinePlayers[0]);
+
+        var player2 = document.getElementById("player2-slot");
+        var player2Name = player2.querySelector(".player-name");
+        if (onlinePlayers[1]) {
+          player2Name.textContent = onlinePlayers[1].name;
+          player2.classList.remove("empty");
+          player2.querySelector(".player-status").textContent = "✓ Gotowy";
+        } else {
+          player2Name.textContent = "Oczekiwanie...";
+          player2.classList.add("empty");
+          player2.querySelector(".player-status").textContent = "⏳";
+        }
+
+        var playersHeader = document.querySelector(".lobby-players h3");
+        playersHeader.textContent = "Gracze (" + onlinePlayers.length + "/2)";
+
+        var startBtn = document.getElementById("start-online-btn");
+        var waitingText = document.getElementById("waiting-text");
+        if (onlinePlayers.length >= 2) {
+          startBtn.disabled = false;
+          waitingText.textContent = "Gotowi do gry!";
+          waitingText.style.color = "var(--accent-cyan)";
+        } else {
+          startBtn.disabled = true;
+          waitingText.textContent = "Czekam na drugiego gracza...";
+          waitingText.style.color = "var(--accent-gold)";
+        }
+      }
+
+      function copyLobbyLink() {
+        var link = document.getElementById("lobby-link").textContent;
+        navigator.clipboard.writeText(link).then(function () {
+          var btn = document.querySelector(".lobby-link-copy");
+          btn.textContent = "✓ Skopiowano!";
+          setTimeout(function () {
+            btn.textContent = "📋 Kopiuj link";
+          }, 2000);
+        });
+      }
+
+      function leaveLobby() {
+        lobbyId = null;
+        isHost = false;
+        onlinePlayers = [];
+        showScreen("menu");
+      }
+
+      function startOnlineGame() {
+        // W przyszłości: synchronizacja przez WebSocket/Firebase
+        // Na razie: symulacja - po prostu startujemy grę PvP
+        G.gameMode = "pvp";
+        G.timeLimit = 5;
+        G.increment = 2;
+        resetGame();
+        showScreen("game");
+      }
+
+      // Sprawdzanie URL przy starcie
+      function checkLobbyUrl() {
+        var params = new URLSearchParams(window.location.search);
+        var lobbyParam = params.get("lobby");
+        if (lobbyParam) {
+          if (!playerProfile) {
+            showProfileScreen();
+            // Po zapisaniu profilu dołącz do lobby
+            window.pendingLobby = lobbyParam;
+          } else {
+            joinLobby(lobbyParam);
+          }
+        }
+      }
+
+      function joinLobby(id) {
+        lobbyId = id;
+        isHost = false;
+        // Symulacja - w prawdziwej wersji połączenie przez WebSocket
+        onlinePlayers = [
+          { name: "Host", isHost: true },
+          { name: playerProfile, isHost: false },
+        ];
+        showScreen("lobby");
+        updateLobbyUI();
+      }
+
+      // Animacja ruchu figury
+      function animateMove(startX, startY, endX, endY, piece, callback) {
+        G.isAnimating = true;
+        var board = document.getElementById("board");
+        var boardRect = board.getBoundingClientRect();
+        var tileSize = boardRect.width / 8;
+
+        // Tworzymy animowany element
+        var movingPiece = document.createElement("div");
+        movingPiece.className = "moving-piece " + piece.color;
+        movingPiece.innerHTML =
+          '<span class="piece-symbol">' + piece.symbol + "</span>";
+        movingPiece.style.position = "fixed";
+        movingPiece.style.width = tileSize + "px";
+        movingPiece.style.height = tileSize + "px";
+        movingPiece.style.display = "flex";
+        movingPiece.style.alignItems = "center";
+        movingPiece.style.justifyContent = "center";
+        movingPiece.style.left = boardRect.left + startX * tileSize + "px";
+        movingPiece.style.top = boardRect.top + startY * tileSize + "px";
+        movingPiece.style.transition =
+          "left 0.25s ease-out, top 0.25s ease-out";
+        movingPiece.style.zIndex = "1000";
+        document.body.appendChild(movingPiece);
+
+        // Uruchamiamy animację
+        requestAnimationFrame(function () {
+          movingPiece.style.left = boardRect.left + endX * tileSize + "px";
+          movingPiece.style.top = boardRect.top + endY * tileSize + "px";
+        });
+
+        // Po zakończeniu animacji
+        setTimeout(function () {
+          movingPiece.remove();
+          G.isAnimating = false;
+          if (callback) callback();
+        }, 280);
+      }
+
+      function initBoard() {
+        G.board = Array(8)
+          .fill(null)
+          .map(() => Array(8).fill(null));
+        const setup = [
+          PIECES.ROOK,
+          PIECES.KNIGHT,
+          PIECES.BISHOP,
+          PIECES.QUEEN,
+          PIECES.KING,
+          PIECES.BISHOP,
+          PIECES.KNIGHT,
+          PIECES.ROOK,
+        ];
+        for (let x = 0; x < 8; x++) {
+          G.board[0][x] = { ...setup[x], color: "black" };
+          G.board[1][x] = { ...PIECES.PAWN, color: "black" };
+          G.board[6][x] = { ...PIECES.PAWN, color: "white" };
+          G.board[7][x] = { ...setup[x], color: "white" };
+        }
+      }
+
+      function resetGame() {
+        initBoard();
+        if (G.timerInterval) clearInterval(G.timerInterval);
+        G.whiteTime = G.timeLimit * 60;
+        G.blackTime = G.timeLimit * 60;
+        G.gameStates = [];
+        G.currentStateIndex = -1;
+        G.analyzing = false;
+        Object.assign(G, {
+          currentPlayer: "white",
+          selectedPiece: null,
+          plannedPath: [],
+          usedDiagonal: false,
+          pendingCaptures: [],
+          capturedByWhite: [],
+          capturedByBlack: [],
+          moveHistory: [],
+          gameOver: false,
+          inCheck: null,
+        });
+        document.getElementById("move-log").innerHTML = "";
+        document.getElementById("analysis-controls").style.display = "none";
+        saveGameState("Start gry", null);
+        updateTimerDisplay();
+        if (G.timeLimit > 0) startTimer();
+        renderBoard();
+        updateUI();
+      }
+
+      function saveGameState(description, color) {
+        var state = {
+          board: JSON.parse(JSON.stringify(G.board)),
+          pendingCaptures: JSON.parse(JSON.stringify(G.pendingCaptures)),
+          capturedByWhite: JSON.parse(JSON.stringify(G.capturedByWhite)),
+          capturedByBlack: JSON.parse(JSON.stringify(G.capturedByBlack)),
+          currentPlayer: G.currentPlayer,
+          inCheck: G.inCheck,
+          description: description,
+          moveColor: color,
+          whiteTime: G.whiteTime,
+          blackTime: G.blackTime,
+          moveNumber: G.gameStates.length,
+        };
+        G.gameStates.push(state);
+        G.currentStateIndex = G.gameStates.length - 1;
+        updateMoveLogWithStates();
+      }
+
+      function updateMoveLogWithStates() {
+        var log = document.getElementById("move-log");
+        log.innerHTML = "";
+        for (var i = G.gameStates.length - 1; i >= 0; i--) {
+          var state = G.gameStates[i];
+          var entry = document.createElement("div");
+          entry.className =
+            "log-entry" +
+            (state.moveColor ? " " + state.moveColor + "-move" : "") +
+            (i === G.currentStateIndex && G.analyzing ? " active-state" : "");
+          entry.textContent = state.moveNumber + ". " + state.description;
+          entry.dataset.stateIndex = i;
+          (function (idx) {
+            entry.addEventListener("click", function () {
+              if (G.gameOver || G.analyzing) {
+                loadGameState(idx);
+              }
+            });
+          })(i);
+          log.appendChild(entry);
+        }
+      }
+
+      function loadGameState(index) {
+        if (index < 0 || index >= G.gameStates.length) return;
+
+        // Reset what-if mode gdy zmieniamy stan
+        resetWhatIfMode();
+
+        G.currentStateIndex = index;
+        G.analyzing = true;
+        var state = G.gameStates[index];
+        G.board = JSON.parse(JSON.stringify(state.board));
+        G.pendingCaptures = JSON.parse(JSON.stringify(state.pendingCaptures));
+        G.capturedByWhite = JSON.parse(JSON.stringify(state.capturedByWhite));
+        G.capturedByBlack = JSON.parse(JSON.stringify(state.capturedByBlack));
+        G.currentPlayer = state.currentPlayer;
+        G.inCheck = state.inCheck;
+
+        document.getElementById("analysis-controls").style.display = "block";
+        document.getElementById("state-info").textContent =
+          "Ruch " +
+          state.moveNumber +
+          "/" +
+          (G.gameStates.length - 1) +
+          ": " +
+          state.description;
+        document.getElementById("whatif-panel").style.display = "block";
+
+        renderBoard();
+        updateUI();
+        updateMoveLogWithStates();
+      }
+
+      function navigateState(delta) {
+        var newIndex = G.currentStateIndex + delta;
+        if (newIndex >= 0 && newIndex < G.gameStates.length) {
+          loadGameState(newIndex);
+        }
+      }
+
+      function startWhatIfMode() {
+        if (!G.analyzing) return;
+        G.whatIfMode = true;
+        G.whatIfBaseIndex = G.currentStateIndex;
+        G.whatIfRounds = 0;
+        // Zapisz stan bazowy
+        G.whatIfBoard = JSON.parse(JSON.stringify(G.board));
+        G.whatIfPending = JSON.parse(JSON.stringify(G.pendingCaptures));
+        G.whatIfCapturedW = JSON.parse(JSON.stringify(G.capturedByWhite));
+        G.whatIfCapturedB = JSON.parse(JSON.stringify(G.capturedByBlack));
+        G.whatIfPlayer = G.currentPlayer;
+        updateWhatIfDisplay();
+      }
+
+      function resetWhatIfMode() {
+        if (G.whatIfMode && G.whatIfBoard) {
+          G.board = JSON.parse(JSON.stringify(G.whatIfBoard));
+          G.pendingCaptures = JSON.parse(JSON.stringify(G.whatIfPending));
+          G.capturedByWhite = JSON.parse(JSON.stringify(G.whatIfCapturedW));
+          G.capturedByBlack = JSON.parse(JSON.stringify(G.whatIfCapturedB));
+          G.currentPlayer = G.whatIfPlayer;
+        }
+        G.whatIfMode = false;
+        G.whatIfRounds = 0;
+        G.whatIfBoard = null;
+        G.whatIfPending = null;
+        G.whatIfCapturedW = null;
+        G.whatIfCapturedB = null;
+        G.whatIfPlayer = null;
+        G.selectedPiece = null;
+        G.plannedPath = [];
+        updateWhatIfDisplay();
+        renderBoard();
+        updateUI();
+      }
+
+      function updateWhatIfDisplay() {
+        var counter = document.getElementById("whatif-rounds");
+        if (counter) {
+          counter.textContent = G.whatIfRounds;
+          if (G.whatIfRounds >= 3) {
+            counter.parentElement.style.color = "var(--accent-magenta)";
+          } else {
+            counter.parentElement.style.color = "var(--accent-gold)";
+          }
+        }
+      }
+
+      function executeWhatIfMove() {
+        if (G.whatIfRounds >= 4) {
+          resetWhatIfMode();
+          return;
+        }
+        G.whatIfRounds++;
+        updateWhatIfDisplay();
+
+        // Po 4 rundach automatyczny reset
+        if (G.whatIfRounds >= 4) {
+          setTimeout(function () {
+            resetWhatIfMode();
+          }, 500);
+        }
+      }
+
+      function formatTime(seconds) {
+        if (seconds === Infinity || (seconds <= 0 && G.timeLimit === 0))
+          return "∞";
+        var mins = Math.floor(seconds / 60);
+        var secs = seconds % 60;
+        return mins + ":" + (secs < 10 ? "0" : "") + secs;
+      }
+
+      function updateTimerDisplay() {
+        var whiteEl = document.getElementById("white-time");
+        var blackEl = document.getElementById("black-time");
+        var whiteTimer = document.getElementById("white-timer");
+        var blackTimer = document.getElementById("black-timer");
+
+        if (G.timeLimit === 0) {
+          whiteEl.textContent = "∞";
+          blackEl.textContent = "∞";
+          whiteTimer.classList.remove("active", "low-time");
+          blackTimer.classList.remove("active", "low-time");
+        } else {
+          whiteEl.textContent = formatTime(G.whiteTime);
+          blackEl.textContent = formatTime(G.blackTime);
+
+          whiteTimer.classList.toggle(
+            "active",
+            G.currentPlayer === "white" && !G.gameOver
+          );
+          blackTimer.classList.toggle(
+            "active",
+            G.currentPlayer === "black" && !G.gameOver
+          );
+          whiteTimer.classList.toggle(
+            "low-time",
+            G.whiteTime <= 30 && G.whiteTime > 0
+          );
+          blackTimer.classList.toggle(
+            "low-time",
+            G.blackTime <= 30 && G.blackTime > 0
+          );
+        }
+      }
+
+      function startTimer() {
+        if (G.timerInterval) clearInterval(G.timerInterval);
+        G.timerInterval = setInterval(function () {
+          if (G.gameOver) {
+            clearInterval(G.timerInterval);
+            return;
+          }
+          if (G.currentPlayer === "white") {
+            G.whiteTime--;
+            if (G.whiteTime <= 0) {
+              G.whiteTime = 0;
+              clearInterval(G.timerInterval);
+              endGame("black", "czas");
+            }
+          } else {
+            G.blackTime--;
+            if (G.blackTime <= 0) {
+              G.blackTime = 0;
+              clearInterval(G.timerInterval);
+              endGame("white", "czas");
+            }
+          }
+          updateTimerDisplay();
+        }, 1000);
+      }
+
+      function addTimeIncrement() {
+        if (G.timeLimit === 0) return;
+        if (G.currentPlayer === "white") {
+          G.whiteTime += G.increment;
+        } else {
+          G.blackTime += G.increment;
+        }
+        updateTimerDisplay();
+      }
+
+      function getZoneClass(x, y) {
+        if (!G.showZones) return "";
+        if ((x === 3 || x === 4) && (y === 3 || y === 4)) return "zone-center";
+        if (x >= 4 && y >= 6) return "zone-nexus-white";
+        if (x <= 3 && y >= 6) return "zone-phantom-white";
+        if (x >= 4 && y <= 1) return "zone-nexus-black";
+        if (x <= 3 && y <= 1) return "zone-phantom-black";
+        return "";
+      }
+
+      function getArrowForMove(fromX, fromY, toX, toY) {
+        var dx = toX - fromX,
+          dy = toY - fromY;
+        if (dx !== 0) dx = dx / Math.abs(dx);
+        if (dy !== 0) dy = dy / Math.abs(dy);
+        for (var key in DIRECTIONS) {
+          var dir = DIRECTIONS[key];
+          if (dir.dx === dx && dir.dy === dy) return dir.arrow;
+        }
+        return "⬤";
+      }
+
+      function isPieceLocked(x, y) {
+        for (var i = 0; i < G.pendingCaptures.length; i++) {
+          if (
+            G.pendingCaptures[i].targetX === x &&
+            G.pendingCaptures[i].targetY === y
+          )
+            return true;
+        }
+        return false;
+      }
+
+      function renderBoard() {
+        var boardEl = document.getElementById("board");
+        boardEl.innerHTML = "";
+        var validMoves = getValidNextSteps();
+
+        var pathArrows = {};
+        for (var i = 1; i < G.plannedPath.length; i++) {
+          var prev = G.plannedPath[i - 1],
+            curr = G.plannedPath[i];
+          pathArrows[curr.x + "," + curr.y] = getArrowForMove(
+            prev.x,
+            prev.y,
+            curr.x,
+            curr.y
+          );
+        }
+
+        var lockArrows = {};
+        G.pendingCaptures.forEach(function (cap) {
+          lockArrows[cap.targetX + "," + cap.targetY] = {
+            arrow: getArrowForMove(
+              cap.attackerX,
+              cap.attackerY,
+              cap.targetX,
+              cap.targetY
+            ),
+            color: cap.attackerColor,
+            turns: cap.turnsLeft,
+            attackerSymbol: cap.attackerSymbol,
+          };
+        });
+
+        for (var y = 0; y < 8; y++) {
+          for (var x = 0; x < 8; x++) {
+            var tile = document.createElement("div");
+            var baseClass = (x + y) % 2 === 0 ? "light" : "dark";
+            var zoneClass = getZoneClass(x, y);
+            tile.className =
+              "tile " + baseClass + (zoneClass ? " " + zoneClass : "");
+            var piece = G.board[y][x];
+
+            var pathKey = x + "," + y;
+            if (pathArrows[pathKey]) {
+              var arrowEl = document.createElement("div");
+              arrowEl.className = "path-arrow";
+              arrowEl.textContent = pathArrows[pathKey];
+              tile.appendChild(arrowEl);
+            }
+
+            var lockKey = x + "," + y;
+            if (lockArrows[lockKey]) {
+              var lockData = lockArrows[lockKey];
+              var lockEl = document.createElement("div");
+              lockEl.className = "lock-arrow " + lockData.color + "-lock";
+              lockEl.textContent = lockData.arrow;
+              tile.appendChild(lockEl);
+              var attackerEl = document.createElement("div");
+              attackerEl.className = "attacker-pos " + lockData.color + "-lock";
+              attackerEl.textContent = lockData.attackerSymbol;
+              tile.appendChild(attackerEl);
+              if (lockData.turns > 0) {
+                var timerEl = document.createElement("div");
+                timerEl.className = "lock-timer " + lockData.color + "-lock";
+                timerEl.textContent = lockData.turns;
+                tile.appendChild(timerEl);
+              }
+              tile.classList.add("threat");
+            }
+
+            if (piece) {
+              var pieceEl = document.createElement("div");
+              pieceEl.className = "piece " + piece.color;
+              if (isPieceAttacking(x, y)) {
+                pieceEl.classList.add("attacking");
+              }
+              pieceEl.innerHTML =
+                '<span class="piece-symbol">' + piece.symbol + "</span>";
+              tile.appendChild(pieceEl);
+              if (piece.type === "king" && G.inCheck === piece.color)
+                tile.classList.add("threatened-king");
+            }
+            if (
+              G.selectedPiece &&
+              G.selectedPiece.x === x &&
+              G.selectedPiece.y === y
+            )
+              tile.classList.add("selected");
+            if (
+              validMoves.some(function (m) {
+                return m.x === x && m.y === y;
+              })
+            )
+              tile.classList.add("valid-move");
+
+            (function (tx, ty) {
+              tile.addEventListener("click", function () {
+                handleTileClick(tx, ty);
+              });
+            })(x, y);
+            boardEl.appendChild(tile);
+          }
+        }
+      }
+
+      function updateUI() {
+        var ti = document.getElementById("turn-indicator");
+        ti.className = "turn-indicator " + G.currentPlayer + "-turn";
+        document.getElementById("current-player").textContent =
+          G.currentPlayer === "white" ? "BIAŁE" : "CZARNE";
+        var mip = document.getElementById("move-info-panel");
+        if (G.selectedPiece) {
+          var piece = G.board[G.selectedPiece.y][G.selectedPiece.x];
+          if (piece) {
+            mip.style.display = "block";
+            document.getElementById("selected-piece-name").textContent =
+              piece.name + " " + piece.symbol;
+            document.getElementById("moves-left").textContent =
+              piece.moves - (G.plannedPath.length - 1);
+          } else mip.style.display = "none";
+        } else mip.style.display = "none";
+        document.getElementById("white-captured").innerHTML = G.capturedByWhite
+          .map(function (p) {
+            return '<div class="captured-piece">' + p.symbol + "</div>";
+          })
+          .join("");
+        document.getElementById("black-captured").innerHTML = G.capturedByBlack
+          .map(function (p) {
+            return '<div class="captured-piece">' + p.symbol + "</div>";
+          })
+          .join("");
+        var pe = document.getElementById("pending-captures");
+        if (G.pendingCaptures.length > 0) {
+          pe.style.display = "block";
+          document.getElementById("pending-list").innerHTML = G.pendingCaptures
+            .map(function (cap) {
+              var target = G.board[cap.targetY]
+                ? G.board[cap.targetY][cap.targetX]
+                : null;
+              return target
+                ? '<div class="pending-item">' +
+                    cap.attackerSymbol +
+                    " → " +
+                    target.symbol +
+                    " (" +
+                    cap.turnsLeft +
+                    " tur)</div>"
+                : "";
+            })
+            .join("");
+        } else pe.style.display = "none";
+
+        // Mobile turn info
+        var mobileTurnPlayer = document.getElementById("mobile-turn-player");
+        var mobileTurnMoves = document.getElementById("mobile-turn-moves");
+        mobileTurnPlayer.textContent =
+          G.currentPlayer === "white" ? "BIAŁE" : "CZARNE";
+        mobileTurnPlayer.className =
+          "mobile-turn-player " + G.currentPlayer + "-turn";
+        if (G.selectedPiece) {
+          var piece = G.board[G.selectedPiece.y][G.selectedPiece.x];
+          if (piece) {
+            var movesLeft = piece.moves - (G.plannedPath.length - 1);
+            mobileTurnMoves.textContent =
+              piece.name +
+              " • " +
+              movesLeft +
+              " " +
+              (movesLeft === 1 ? "krok" : "kroki");
+          } else {
+            mobileTurnMoves.textContent = "";
+          }
+        } else {
+          mobileTurnMoves.textContent = "Wybierz figurę";
+        }
+
+        // Obrót planszy w PvP na mobile
+        updateBoardRotation();
+      }
+
+      function updateBoardRotation() {
+        var boardWrapper = document.getElementById("board-wrapper");
+        if (
+          G.gameMode === "pvp" &&
+          window.innerWidth <= 900 &&
+          !G.gameOver &&
+          !G.analyzing
+        ) {
+          if (G.currentPlayer === "black") {
+            boardWrapper.classList.add("rotated");
+          } else {
+            boardWrapper.classList.remove("rotated");
+          }
+        } else {
+          boardWrapper.classList.remove("rotated");
+        }
+      }
+
+      function updateMoveLog(text, color) {
+        // Ta funkcja jest teraz tylko wrapperem - zapis stanu robi saveGameState
+      }
+
+      function getValidNextSteps() {
+        if (!G.selectedPiece) return [];
+        var piece = G.board[G.selectedPiece.y][G.selectedPiece.x];
+        if (!piece) return [];
+        var movesUsed = G.plannedPath.length - 1;
+        var movesLeft = piece.moves - movesUsed;
+        if (movesLeft <= 0) return [];
+        var lastPos =
+          G.plannedPath.length > 0
+            ? G.plannedPath[G.plannedPath.length - 1]
+            : G.selectedPiece;
+        var validMoves = [];
+        var isLastStep = movesLeft === 1;
+        var weAreLocked = isPieceLocked(G.selectedPiece.x, G.selectedPiece.y);
+
+        for (var key in DIRECTIONS) {
+          var dir = DIRECTIONS[key];
+          if (piece.straightOnly && dir.diagonal) continue;
+          if (piece.diagonalOnly && !dir.diagonal) continue;
+          if (dir.diagonal && G.usedDiagonal) continue;
+
+          if (piece.type === "pawn") {
+            var forward = piece.color === "white" ? "n" : "s";
+            var forwardDiags =
+              piece.color === "white" ? ["ne", "nw"] : ["se", "sw"];
+            if (key !== forward && forwardDiags.indexOf(key) === -1) continue;
+            var tx = lastPos.x + dir.dx,
+              ty = lastPos.y + dir.dy;
+            var tp = G.board[ty] ? G.board[ty][tx] : null;
+            if (weAreLocked) {
+              if (forwardDiags.indexOf(key) !== -1) continue;
+            } else {
+              if (
+                forwardDiags.indexOf(key) !== -1 &&
+                (!tp || tp.color === piece.color)
+              )
+                continue;
+            }
+            if (key === forward && tp) continue;
+          }
+
+          var newX = lastPos.x + dir.dx,
+            newY = lastPos.y + dir.dy;
+          if (newX < 0 || newX > 7 || newY < 0 || newY > 7) continue;
+          var targetPiece = G.board[newY][newX];
+          if (targetPiece && targetPiece.color === piece.color) continue;
+          if (
+            G.plannedPath.some(function (p) {
+              return p.x === newX && p.y === newY;
+            })
+          )
+            continue;
+          if (weAreLocked && targetPiece) continue;
+          if (targetPiece && targetPiece.color !== piece.color && !isLastStep)
+            continue;
+
+          validMoves.push({ x: newX, y: newY, diagonal: dir.diagonal });
+        }
+        return validMoves;
+      }
+
+      function isPieceAttacking(x, y) {
+        for (var i = 0; i < G.pendingCaptures.length; i++) {
+          if (
+            G.pendingCaptures[i].attackerX === x &&
+            G.pendingCaptures[i].attackerY === y
+          ) {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function handleTileClick(x, y) {
+        // W normalnej grze
+        if (!G.gameOver && !G.analyzing) {
+          handleNormalMove(x, y);
+          return;
+        }
+
+        // W trybie analizy - włącz what-if jeśli nie aktywny
+        if (G.analyzing && G.whatIfRounds < 4) {
+          if (!G.whatIfMode) {
+            startWhatIfMode();
+          }
+          handleWhatIfMove(x, y);
+        }
+      }
+
+      function handleNormalMove(x, y) {
+        var piece = G.board[y][x];
+        var validMoves = getValidNextSteps();
+
+        if (!G.selectedPiece) {
+          if (piece && piece.color === G.currentPlayer) {
+            if (isPieceAttacking(x, y)) return;
+            G.selectedPiece = { x: x, y: y };
+            G.plannedPath = [{ x: x, y: y }];
+            G.usedDiagonal = false;
+            renderBoard();
+            updateUI();
+          }
+          return;
+        }
+        if (
+          G.selectedPiece.x === x &&
+          G.selectedPiece.y === y &&
+          G.plannedPath.length === 1
+        ) {
+          G.selectedPiece = null;
+          G.plannedPath = [];
+          G.usedDiagonal = false;
+          renderBoard();
+          updateUI();
+          return;
+        }
+
+        var validMove = null;
+        for (var i = 0; i < validMoves.length; i++) {
+          if (validMoves[i].x === x && validMoves[i].y === y) {
+            validMove = validMoves[i];
+            break;
+          }
+        }
+
+        if (validMove) {
+          if (validMove.diagonal) G.usedDiagonal = true;
+          G.plannedPath.push({ x: x, y: y });
+          var selectedPiece = G.board[G.selectedPiece.y][G.selectedPiece.x];
+          var movesUsed = G.plannedPath.length - 1;
+          var targetPiece = G.board[y][x];
+
+          if (movesUsed >= selectedPiece.moves || targetPiece) {
+            executeMove();
+          } else {
+            renderBoard();
+            updateUI();
+          }
+          return;
+        }
+
+        if (piece && piece.color === G.currentPlayer) {
+          if (isPieceAttacking(x, y)) return;
+          G.selectedPiece = { x: x, y: y };
+          G.plannedPath = [{ x: x, y: y }];
+          G.usedDiagonal = false;
+          renderBoard();
+          updateUI();
+        }
+      }
+
+      function handleWhatIfMove(x, y) {
+        var piece = G.board[y][x];
+        var validMoves = getValidNextSteps();
+
+        if (!G.selectedPiece) {
+          if (piece && piece.color === G.currentPlayer) {
+            if (isPieceAttacking(x, y)) return;
+            G.selectedPiece = { x: x, y: y };
+            G.plannedPath = [{ x: x, y: y }];
+            G.usedDiagonal = false;
+            renderBoard();
+            updateUI();
+          }
+          return;
+        }
+        if (
+          G.selectedPiece.x === x &&
+          G.selectedPiece.y === y &&
+          G.plannedPath.length === 1
+        ) {
+          G.selectedPiece = null;
+          G.plannedPath = [];
+          G.usedDiagonal = false;
+          renderBoard();
+          updateUI();
+          return;
+        }
+
+        var validMove = null;
+        for (var i = 0; i < validMoves.length; i++) {
+          if (validMoves[i].x === x && validMoves[i].y === y) {
+            validMove = validMoves[i];
+            break;
+          }
+        }
+
+        if (validMove) {
+          if (validMove.diagonal) G.usedDiagonal = true;
+          G.plannedPath.push({ x: x, y: y });
+          var selectedPiece = G.board[G.selectedPiece.y][G.selectedPiece.x];
+          var movesUsed = G.plannedPath.length - 1;
+          var targetPiece = G.board[y][x];
+
+          if (movesUsed >= selectedPiece.moves || targetPiece) {
+            executeWhatIfMoveAction();
+          } else {
+            renderBoard();
+            updateUI();
+          }
+          return;
+        }
+
+        if (piece && piece.color === G.currentPlayer) {
+          if (isPieceAttacking(x, y)) return;
+          G.selectedPiece = { x: x, y: y };
+          G.plannedPath = [{ x: x, y: y }];
+          G.usedDiagonal = false;
+          renderBoard();
+          updateUI();
+        }
+      }
+
+      function executeWhatIfMoveAction() {
+        if (G.plannedPath.length < 2) return;
+        if (G.whatIfRounds >= 4) {
+          resetWhatIfMode();
+          return;
+        }
+
+        var startPos = G.selectedPiece;
+        var endPos = G.plannedPath[G.plannedPath.length - 1];
+        var piece = G.board[startPos.y][startPos.x];
+        var targetPiece = G.board[endPos.y][endPos.x];
+
+        // Usuń z blokady jeśli uciekamy
+        var wasLocked = isPieceLocked(startPos.x, startPos.y);
+        if (wasLocked) {
+          for (var i = G.pendingCaptures.length - 1; i >= 0; i--) {
+            if (
+              G.pendingCaptures[i].targetX === startPos.x &&
+              G.pendingCaptures[i].targetY === startPos.y
+            ) {
+              G.pendingCaptures.splice(i, 1);
+              break;
+            }
+          }
+        }
+
+        G.board[startPos.y][startPos.x] = null;
+
+        if (targetPiece && targetPiece.color !== piece.color) {
+          // Blokowanie w what-if
+          if (targetPiece.type === "king") {
+            G.pendingCaptures.push({
+              attackerX: startPos.x,
+              attackerY: startPos.y,
+              attackerColor: piece.color,
+              attackerSymbol: piece.symbol,
+              attackerPiece: JSON.parse(JSON.stringify(piece)),
+              targetX: endPos.x,
+              targetY: endPos.y,
+              turnsLeft: 1,
+              isNexusLock: true,
+            });
+          } else {
+            G.pendingCaptures.push({
+              attackerX: startPos.x,
+              attackerY: startPos.y,
+              attackerColor: piece.color,
+              attackerSymbol: piece.symbol,
+              attackerPiece: JSON.parse(JSON.stringify(piece)),
+              targetX: endPos.x,
+              targetY: endPos.y,
+              turnsLeft: 2,
+              isNexusLock: false,
+            });
+          }
+          G.board[startPos.y][startPos.x] = piece;
+        } else {
+          G.board[endPos.y][endPos.x] = piece;
+          // Promocja
+          if (
+            piece.type === "pawn" &&
+            ((piece.color === "white" && endPos.y === 0) ||
+              (piece.color === "black" && endPos.y === 7))
+          ) {
+            Object.assign(piece, PIECES.QUEEN, { color: piece.color });
+          }
+        }
+
+        G.selectedPiece = null;
+        G.plannedPath = [];
+        G.usedDiagonal = false;
+
+        // Prosta zmiana gracza (bez pełnej logiki processPendingCaptures)
+        G.currentPlayer = G.currentPlayer === "white" ? "black" : "white";
+
+        G.whatIfRounds++;
+        updateWhatIfDisplay();
+
+        // Po 4 rundach automatyczny reset
+        if (G.whatIfRounds >= 4) {
+          setTimeout(function () {
+            resetWhatIfMode();
+          }, 1000);
+        }
+
+        renderBoard();
+        updateUI();
+      }
+
+      function executeMove() {
+        if (G.plannedPath.length < 2) return;
+        if (G.analyzing) return; // Nie można grać podczas analizy
+        if (G.isAnimating) return; // Nie wykonuj podczas animacji
+
+        var startPos = G.selectedPiece;
+        var endPos = G.plannedPath[G.plannedPath.length - 1];
+        var piece = G.board[startPos.y][startPos.x];
+        var targetPiece = G.board[endPos.y][endPos.x];
+        var moveDesc = "";
+        var moveColor = G.currentPlayer;
+
+        // Określ końcową pozycję dla animacji
+        var animEndX = endPos.x;
+        var animEndY = endPos.y;
+
+        // Jeśli to atak, figura kończy tuż przed celem
+        if (targetPiece && targetPiece.color !== piece.color) {
+          // Dla ataku - animacja do przedostatniego pola
+          if (G.plannedPath.length > 2) {
+            var beforeEnd = G.plannedPath[G.plannedPath.length - 2];
+            animEndX = beforeEnd.x;
+            animEndY = beforeEnd.y;
+          } else {
+            animEndX = startPos.x;
+            animEndY = startPos.y;
+          }
+        }
+
+        // Schowaj figurę z planszy na czas animacji
+        var originalTile = document.querySelector(
+          ".board .tile:nth-child(" +
+            (startPos.y * 8 + startPos.x + 1) +
+            ") .piece"
+        );
+        if (originalTile) originalTile.style.visibility = "hidden";
+
+        // Uruchom animację
+        animateMove(
+          startPos.x,
+          startPos.y,
+          animEndX,
+          animEndY,
+          piece,
+          function () {
+            // Po animacji wykonaj ruch
+            finishMove(startPos, endPos, piece, targetPiece, moveColor);
+          }
+        );
+      }
+
+      function finishMove(startPos, endPos, piece, targetPiece, moveColor) {
+        var moveDesc = "";
+
+        var wasLocked = isPieceLocked(startPos.x, startPos.y);
+        if (wasLocked) {
+          for (var i = G.pendingCaptures.length - 1; i >= 0; i--) {
+            if (
+              G.pendingCaptures[i].targetX === startPos.x &&
+              G.pendingCaptures[i].targetY === startPos.y
+            ) {
+              G.pendingCaptures.splice(i, 1);
+              moveDesc = piece.symbol + " uciekł!";
+              break;
+            }
+          }
+        }
+
+        G.board[startPos.y][startPos.x] = null;
+
+        if (targetPiece && targetPiece.color !== piece.color) {
+          if (targetPiece.type === "king") {
+            G.inCheck = targetPiece.color;
+            G.pendingCaptures.push({
+              attackerX: startPos.x,
+              attackerY: startPos.y,
+              attackerColor: piece.color,
+              attackerSymbol: piece.symbol,
+              attackerPiece: JSON.parse(JSON.stringify(piece)),
+              targetX: endPos.x,
+              targetY: endPos.y,
+              turnsLeft: 1,
+              isNexusLock: true,
+            });
+          } else {
+            G.pendingCaptures.push({
+              attackerX: startPos.x,
+              attackerY: startPos.y,
+              attackerColor: piece.color,
+              attackerSymbol: piece.symbol,
+              attackerPiece: JSON.parse(JSON.stringify(piece)),
+              targetX: endPos.x,
+              targetY: endPos.y,
+              turnsLeft: 2,
+              isNexusLock: false,
+            });
+          }
+          G.board[startPos.y][startPos.x] = piece;
+          moveDesc =
+            moveDesc || piece.symbol + " blokuje " + targetPiece.symbol + "!";
+        } else {
+          G.board[endPos.y][endPos.x] = piece;
+          moveDesc =
+            moveDesc ||
+            piece.symbol +
+              " " +
+              String.fromCharCode(97 + startPos.x) +
+              (8 - startPos.y) +
+              "→" +
+              String.fromCharCode(97 + endPos.x) +
+              (8 - endPos.y);
+          if (
+            piece.type === "pawn" &&
+            ((piece.color === "white" && endPos.y === 0) ||
+              (piece.color === "black" && endPos.y === 7))
+          ) {
+            Object.assign(piece, PIECES.QUEEN, { color: piece.color });
+            moveDesc += " (Promocja!)";
+          }
+        }
+
+        G.selectedPiece = null;
+        G.plannedPath = [];
+        G.usedDiagonal = false;
+        addTimeIncrement();
+
+        // Zapisz stan przed processPendingCaptures
+        saveGameState(moveDesc, moveColor);
+
+        processPendingCaptures();
+        switchTurn();
+      }
+
+      function processPendingCaptures() {
+        var newPending = [];
+        var captureHappened = false;
+        var captureDesc = "";
+        var captureColor = "";
+
+        G.pendingCaptures.forEach(function (cap) {
+          var targetPiece = G.board[cap.targetY]
+            ? G.board[cap.targetY][cap.targetX]
+            : null;
+          if (!targetPiece) return; // uciekł
+          if (targetPiece.color === cap.attackerColor) return;
+
+          // Zmniejsz licznik tylko gdy to tura obrońcy
+          if (targetPiece.color === G.currentPlayer) {
+            cap.turnsLeft--;
+            if (cap.turnsLeft <= 0) {
+              // Czas minął - zbicie!
+              if (cap.isNexusLock) {
+                // Mat - Nexus nie uciekł w czasie
+                endGame(cap.attackerColor, "mat");
+                return;
+              }
+              (targetPiece.color === "white"
+                ? G.capturedByBlack
+                : G.capturedByWhite
+              ).push(targetPiece);
+              G.board[cap.targetY][cap.targetX] = cap.attackerPiece;
+              if (
+                G.board[cap.attackerY] &&
+                G.board[cap.attackerY][cap.attackerX] &&
+                G.board[cap.attackerY][cap.attackerX].symbol ===
+                  cap.attackerSymbol
+              ) {
+                G.board[cap.attackerY][cap.attackerX] = null;
+              }
+              captureHappened = true;
+              captureDesc =
+                cap.attackerSymbol + " zbija " + targetPiece.symbol + "!";
+              captureColor = cap.attackerColor;
+              return;
+            }
+          }
+          newPending.push(cap);
+        });
+        G.pendingCaptures = newPending;
+        G.inCheck = null;
+        G.pendingCaptures.forEach(function (cap) {
+          if (cap.isNexusLock) {
+            var t = G.board[cap.targetY]
+              ? G.board[cap.targetY][cap.targetX]
+              : null;
+            if (t && t.type === "king") G.inCheck = t.color;
+          }
+        });
+
+        if (captureHappened) {
+          saveGameState(captureDesc, captureColor);
+        }
+      }
+
+      function switchTurn() {
+        G.currentPlayer = G.currentPlayer === "white" ? "black" : "white";
+
+        // Sprawdź czy Nexus jest zablokowany i czy ma gdzie uciec
+        for (var i = 0; i < G.pendingCaptures.length; i++) {
+          var cap = G.pendingCaptures[i];
+          if (cap.isNexusLock) {
+            var target = G.board[cap.targetY]
+              ? G.board[cap.targetY][cap.targetX]
+              : null;
+            if (
+              target &&
+              target.type === "king" &&
+              target.color === G.currentPlayer
+            ) {
+              // Nexus jest zablokowany - sprawdź czy ma bezpieczne pola do ucieczki
+              var nexusMoves = getAllMovesForPiece(
+                cap.targetX,
+                cap.targetY,
+                target,
+                true
+              );
+              if (nexusMoves.length === 0) {
+                // Brak bezpiecznych pól = mat
+                endGame(G.currentPlayer === "white" ? "black" : "white", "mat");
+                return;
+              }
+            }
+          }
+        }
+
+        renderBoard();
+        updateUI();
+        if (G.gameOver) return;
+        if (!hasLegalMoves(G.currentPlayer)) {
+          if (G.inCheck === G.currentPlayer) {
+            endGame(G.currentPlayer === "white" ? "black" : "white", "mat");
+          } else {
+            endGame(null, "pat");
+          }
+          return;
+        }
+        if (G.gameMode === "bot" && G.currentPlayer === "black" && !G.gameOver)
+          setTimeout(makeBotMove, 800);
+      }
+
+      function hasLegalMoves(color) {
+        for (var y = 0; y < 8; y++) {
+          for (var x = 0; x < 8; x++) {
+            var piece = G.board[y][x];
+            if (piece && piece.color === color) {
+              // Figura która atakuje nie może się ruszać
+              if (isPieceAttacking(x, y)) continue;
+              if (
+                getAllMovesForPiece(x, y, piece, isPieceLocked(x, y)).length > 0
+              )
+                return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      // Sprawdza czy pole (x,y) może być zaatakowane przez gracza enemyColor
+      function isSquareThreatened(x, y, enemyColor) {
+        for (var py = 0; py < 8; py++) {
+          for (var px = 0; px < 8; px++) {
+            var piece = G.board[py][px];
+            if (!piece || piece.color !== enemyColor) continue;
+            // Sprawdź czy ta figura może dotrzeć na pole (x,y)
+            if (canPieceReachSquare(px, py, x, y, piece)) return true;
+          }
+        }
+        return false;
+      }
+
+      // Sprawdza czy figura z (fromX,fromY) może dotrzeć na (toX,toY)
+      function canPieceReachSquare(fromX, fromY, toX, toY, piece) {
+        var visited = {};
+        var queue = [{ x: fromX, y: fromY, steps: 0, usedDiag: false }];
+        visited[fromX + "," + fromY] = true;
+
+        while (queue.length > 0) {
+          var current = queue.shift();
+          if (current.steps >= piece.moves) continue;
+
+          for (var key in DIRECTIONS) {
+            var dir = DIRECTIONS[key];
+            if (piece.straightOnly && dir.diagonal) continue;
+            if (piece.diagonalOnly && !dir.diagonal) continue;
+            if (dir.diagonal && current.usedDiag) continue;
+
+            var newX = current.x + dir.dx;
+            var newY = current.y + dir.dy;
+            if (newX < 0 || newX > 7 || newY < 0 || newY > 7) continue;
+
+            var visitKey =
+              newX + "," + newY + "," + (current.usedDiag || dir.diagonal);
+            if (visited[visitKey]) continue;
+
+            var targetPiece = G.board[newY][newX];
+            // Nie może przejść przez własne figury
+            if (targetPiece && targetPiece.color === piece.color) continue;
+
+            // Czy to jest pole docelowe?
+            if (newX === toX && newY === toY) return true;
+
+            // Nie może przejść przez wrogie figury (ale może na nich skończyć)
+            if (targetPiece && targetPiece.color !== piece.color) continue;
+
+            visited[visitKey] = true;
+            queue.push({
+              x: newX,
+              y: newY,
+              steps: current.steps + 1,
+              usedDiag: current.usedDiag || dir.diagonal,
+            });
+          }
+        }
+        return false;
+      }
+
+      function getAllMovesForPiece(startX, startY, piece, isLocked) {
+        var allMoves = [];
+        var enemyColor = piece.color === "white" ? "black" : "white";
+
+        function explore(path, usedDiag) {
+          if (path.length > piece.moves + 1) return;
+          var isLastStep = path.length === piece.moves + 1;
+          if (path.length > 1) {
+            var last = path[path.length - 1];
+            var targetPiece = G.board[last.y] ? G.board[last.y][last.x] : null;
+
+            // Nexus nie może wchodzić na zagrożone pola
+            if (piece.type === "king") {
+              // Tymczasowo usuń Nexusa z planszy do sprawdzenia zagrożeń
+              var originalPiece = G.board[startY][startX];
+              G.board[startY][startX] = null;
+              var isThreatened = isSquareThreatened(last.x, last.y, enemyColor);
+              G.board[startY][startX] = originalPiece;
+              if (isThreatened) return; // Nie dodawaj tego ruchu
+            }
+
+            if (isLocked) {
+              if (!targetPiece) allMoves.push(path.slice());
+            } else {
+              if (
+                !targetPiece ||
+                (targetPiece.color !== piece.color && isLastStep)
+              )
+                allMoves.push(path.slice());
+            }
+          }
+          if (path.length >= piece.moves + 1) return;
+          var lastPos = path[path.length - 1];
+          for (var key in DIRECTIONS) {
+            var dir = DIRECTIONS[key];
+            if (piece.straightOnly && dir.diagonal) continue;
+            if (piece.diagonalOnly && !dir.diagonal) continue;
+            if (dir.diagonal && usedDiag) continue;
+            if (piece.type === "pawn") {
+              var forward = piece.color === "white" ? "n" : "s";
+              var forwardDiags =
+                piece.color === "white" ? ["ne", "nw"] : ["se", "sw"];
+              if (key !== forward && forwardDiags.indexOf(key) === -1) continue;
+              var tx = lastPos.x + dir.dx,
+                ty = lastPos.y + dir.dy;
+              var tp = G.board[ty] ? G.board[ty][tx] : null;
+              if (isLocked) {
+                if (forwardDiags.indexOf(key) !== -1) continue;
+              } else {
+                if (
+                  forwardDiags.indexOf(key) !== -1 &&
+                  (!tp || tp.color === piece.color)
+                )
+                  continue;
+              }
+              if (key === forward && tp) continue;
+            }
+            var newX = lastPos.x + dir.dx,
+              newY = lastPos.y + dir.dy;
+            if (newX < 0 || newX > 7 || newY < 0 || newY > 7) continue;
+            var targetPiece = G.board[newY][newX];
+            if (targetPiece && targetPiece.color === piece.color) continue;
+            var inPath = false;
+            for (var i = 0; i < path.length; i++) {
+              if (path[i].x === newX && path[i].y === newY) {
+                inPath = true;
+                break;
+              }
+            }
+            if (inPath) continue;
+            if (isLocked && targetPiece) continue;
+            var newPath = path.slice();
+            newPath.push({ x: newX, y: newY });
+            explore(newPath, usedDiag || dir.diagonal);
+          }
+        }
+        explore([{ x: startX, y: startY }], false);
+        return allMoves;
+      }
+
+      function endGame(winner, type) {
+        G.gameOver = true;
+        if (G.timerInterval) clearInterval(G.timerInterval);
+        updateTimerDisplay();
+
+        var title, message;
+        if (type === "mat") {
+          title = "SZACH MAT!";
+          message = (winner === "white" ? "Białe" : "Czarne") + " wygrywają!";
+        } else if (type === "czas") {
+          title = "KONIEC CZASU!";
+          message = (winner === "white" ? "Białe" : "Czarne") + " wygrywają!";
+        } else {
+          title = "PAT!";
+          message = "Remis!";
+        }
+
+        document.getElementById("modal-title").textContent = title;
+        document.getElementById("modal-message").textContent = message;
+        document.getElementById("game-over-modal").classList.add("active");
+      }
+
+      function makeBotMove() {
+        if (G.gameOver) return;
+        for (var i = 0; i < G.pendingCaptures.length; i++) {
+          var cap = G.pendingCaptures[i];
+          if (cap.isNexusLock) {
+            var target = G.board[cap.targetY]
+              ? G.board[cap.targetY][cap.targetX]
+              : null;
+            if (target && target.type === "king" && target.color === "black") {
+              var nexusMoves = getAllMovesForPiece(
+                cap.targetX,
+                cap.targetY,
+                target,
+                true
+              );
+              if (nexusMoves.length > 0) {
+                G.selectedPiece = { x: cap.targetX, y: cap.targetY };
+                G.plannedPath =
+                  nexusMoves[Math.floor(Math.random() * nexusMoves.length)];
+                executeMove();
+                return;
+              }
+            }
+          }
+        }
+        for (var i = 0; i < G.pendingCaptures.length; i++) {
+          var cap = G.pendingCaptures[i];
+          if (!cap.isNexusLock) {
+            var target = G.board[cap.targetY]
+              ? G.board[cap.targetY][cap.targetX]
+              : null;
+            if (target && target.color === "black") {
+              var escapeMoves = getAllMovesForPiece(
+                cap.targetX,
+                cap.targetY,
+                target,
+                true
+              );
+              if (escapeMoves.length > 0) {
+                G.selectedPiece = { x: cap.targetX, y: cap.targetY };
+                G.plannedPath =
+                  escapeMoves[Math.floor(Math.random() * escapeMoves.length)];
+                executeMove();
+                return;
+              }
+            }
+          }
+        }
+        var allMoves = [];
+        for (var y = 0; y < 8; y++) {
+          for (var x = 0; x < 8; x++) {
+            var piece = G.board[y][x];
+            if (piece && piece.color === "black") {
+              // Nie ruszaj figurą która atakuje
+              if (isPieceAttacking(x, y)) continue;
+              var moves = getAllMovesForPiece(x, y, piece, isPieceLocked(x, y));
+              for (var m = 0; m < moves.length; m++) {
+                var path = moves[m];
+                if (path.length > 1) {
+                  var endPos = path[path.length - 1];
+                  var target = G.board[endPos.y][endPos.x];
+                  var score = Math.random() * 5;
+                  if (target && target.color === "white") {
+                    var vals = {
+                      king: 1000,
+                      queen: 90,
+                      rook: 50,
+                      bishop: 35,
+                      knight: 30,
+                      pawn: 10,
+                    };
+                    score += vals[target.type] || 10;
+                  }
+                  score +=
+                    (7 - Math.abs(endPos.x - 3.5) - Math.abs(endPos.y - 3.5)) *
+                    2;
+                  if (piece.type === "pawn") score += endPos.y * 3;
+                  allMoves.push({
+                    from: { x: x, y: y },
+                    path: path,
+                    piece: piece,
+                    score: score,
+                  });
+                }
+              }
+            }
+          }
+        }
+        if (allMoves.length === 0) return;
+        allMoves.sort(function (a, b) {
+          return b.score - a.score;
+        });
+        var poolSize =
+          G.difficulty === "easy"
+            ? Math.max(1, Math.floor(allMoves.length / 2))
+            : G.difficulty === "hard"
+            ? 3
+            : 5;
+        var pool = allMoves.slice(0, Math.min(poolSize, allMoves.length));
+        var selectedMove = pool[Math.floor(Math.random() * pool.length)];
+        G.selectedPiece = selectedMove.from;
+        G.plannedPath = selectedMove.path;
+        for (var j = 1; j < selectedMove.path.length; j++) {
+          var prev = selectedMove.path[j - 1],
+            curr = selectedMove.path[j];
+          if (
+            Math.abs(curr.x - prev.x) === 1 &&
+            Math.abs(curr.y - prev.y) === 1
+          ) {
+            G.usedDiagonal = true;
+            break;
+          }
+        }
+        executeMove();
+      }
+
+      document.querySelectorAll(".nav-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          document.querySelectorAll(".nav-btn").forEach(function (b) {
+            b.classList.remove("active");
+          });
+          document.querySelectorAll(".screen").forEach(function (s) {
+            s.classList.remove("active");
+          });
+          btn.classList.add("active");
+          document
+            .getElementById(btn.dataset.screen + "-screen")
+            .classList.add("active");
+        });
+      });
+      document.querySelectorAll(".mode-card").forEach(function (card) {
+        card.addEventListener("click", function () {
+          if (card.dataset.mode === "online") {
+            createLobby();
+            return;
+          }
+          G.gameMode = card.dataset.mode;
+          document.getElementById("time-select").style.display = "block";
+          if (card.dataset.mode === "bot") {
+            document.getElementById("difficulty-select").style.display =
+              "block";
+          } else {
+            document.getElementById("difficulty-select").style.display = "none";
+          }
+        });
+      });
+      document.querySelectorAll(".diff-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          document.querySelectorAll(".diff-btn").forEach(function (b) {
+            b.classList.remove("selected");
+          });
+          btn.classList.add("selected");
+          G.difficulty = btn.dataset.diff;
+        });
+      });
+      document.querySelectorAll(".time-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          document.querySelectorAll(".time-btn").forEach(function (b) {
+            b.classList.remove("selected");
+          });
+          btn.classList.add("selected");
+          G.timeLimit = parseInt(btn.dataset.time);
+          if (G.timeLimit > 0) {
+            document.getElementById("increment-select").style.display = "block";
+          } else {
+            document.getElementById("increment-select").style.display = "none";
+            G.increment = 0;
+            startGame();
+          }
+        });
+      });
+      document.querySelectorAll(".inc-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          document.querySelectorAll(".inc-btn").forEach(function (b) {
+            b.classList.remove("selected");
+          });
+          btn.classList.add("selected");
+          G.increment = parseInt(btn.dataset.inc);
+          startGame();
+        });
+      });
+      document
+        .getElementById("new-game-btn")
+        .addEventListener("click", function () {
+          document.getElementById("game-over-modal").classList.remove("active");
+          if (G.timerInterval) clearInterval(G.timerInterval);
+          document.querySelectorAll(".nav-btn").forEach(function (b) {
+            b.classList.remove("active");
+          });
+          document.querySelectorAll(".screen").forEach(function (s) {
+            s.classList.remove("active");
+          });
+          document
+            .querySelector('[data-screen="menu"]')
+            .classList.add("active");
+          document.getElementById("menu-screen").classList.add("active");
+          // Reset menu selections
+          document.getElementById("difficulty-select").style.display = "none";
+          document.getElementById("time-select").style.display = "none";
+          document.getElementById("increment-select").style.display = "none";
+          document
+            .querySelectorAll(".diff-btn, .time-btn, .inc-btn")
+            .forEach(function (b) {
+              b.classList.remove("selected");
+            });
+        });
+      document
+        .getElementById("show-zones")
+        .addEventListener("change", function () {
+          G.showZones = this.checked;
+          renderBoard();
+        });
+      document
+        .getElementById("btn-first")
+        .addEventListener("click", function () {
+          loadGameState(0);
+        });
+      document
+        .getElementById("btn-prev")
+        .addEventListener("click", function () {
+          navigateState(-1);
+        });
+      document
+        .getElementById("btn-next")
+        .addEventListener("click", function () {
+          navigateState(1);
+        });
+      document
+        .getElementById("btn-last")
+        .addEventListener("click", function () {
+          loadGameState(G.gameStates.length - 1);
+        });
+      document
+        .getElementById("btn-reset-whatif")
+        .addEventListener("click", function () {
+          resetWhatIfMode();
+        });
+      function startGame() {
+        document.querySelectorAll(".nav-btn").forEach(function (b) {
+          b.classList.remove("active");
+        });
+        document.querySelectorAll(".screen").forEach(function (s) {
+          s.classList.remove("active");
+        });
+        document.querySelector('[data-screen="game"]').classList.add("active");
+        document.getElementById("game-screen").classList.add("active");
+        resetGame();
+      }
+
+      // Inicjalizacja
+      initProfile();
+      checkLobbyUrl();
+      initBoard();
+      renderBoard();
+      updateUI();
+    </script>
+  </body>
+</html>
