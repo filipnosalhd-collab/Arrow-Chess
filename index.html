@@ -821,8 +821,8 @@
         border-radius: 3px;
         z-index: 5;
       }
-      /* Figura pod atakiem - pulsowanie na żółto */
-      .piece.under-attack {
+      /* Figura atakująca - pulsowanie na żółto */
+      .piece.is-attacker {
         animation: attackPulse 1s infinite ease-in-out;
       }
       @keyframes attackPulse {
@@ -2303,6 +2303,52 @@
             </p>
           </div>
 
+          <h2>◈ Warunki Remisu</h2>
+          <div class="highlight-box">
+            <p>
+              <strong
+                >Gra kończy się remisem w następujących sytuacjach:</strong
+              >
+            </p>
+            <p>
+              • <strong>10 ruchów bez ataku:</strong> Jeśli przez 10 kolejnych
+              ruchów (5 pełnych rund) żaden gracz nie zaatakuje żadnej figury i
+              nie ma aktywnych blokad, gra kończy się remisem.
+            </p>
+            <p>
+              • <strong>Pogromca nieaktywny:</strong> Jeśli figura lub pionek,
+              który zbił <strong>przynajmniej 3 figury</strong>, nie zostanie
+              użyta przez <strong>4 tury z rzędu</strong> przez swojego
+              właściciela, gra kończy się remisem.
+            </p>
+            <p>
+              • <strong>Propozycja remisu:</strong> W trybie online gracze mogą
+              zaproponować remis. Jeśli przeciwnik zaakceptuje, gra kończy się
+              remisem.
+            </p>
+            <p>• Za remis każdy gracz otrzymuje <strong>+30 ELO</strong>.</p>
+          </div>
+
+          <h2>◈ System ELO</h2>
+          <div class="highlight-box">
+            <p>
+              <strong>Punktacja ELO:</strong> Za każdy ruch i wynik gry
+              otrzymujesz lub tracisz punkty ELO.
+            </p>
+            <p><strong>Za ruchy:</strong></p>
+            <p>• !! Brilliant: +30 | ! Great: +20 | ✓ Good: +12 | 📖 Book: 0</p>
+            <p>• ?! Inaccuracy: -8 | ? Mistake: -18 | ?? Blunder: -30</p>
+            <p>• Szach: +20 | Mat (ruch końcowy): +75</p>
+            <p><strong>Za wygraną:</strong></p>
+            <p>• Online/Bot trudny: +100 (mat) / +60 (inna wygrana)</p>
+            <p>• Bot średni: +50 (mat) / +30 (wygrana)</p>
+            <p>• Bot łatwy: +33 (mat) / +20 (wygrana)</p>
+            <p><strong>Za przegraną:</strong></p>
+            <p>
+              • Bot łatwy: -50 | Bot średni: -30 | Bot trudny: -15 | Online: -30
+            </p>
+          </div>
+
           <h2>◈ 1. Wprowadzenie do Gry</h2>
           <p>
             <strong>Strzałkowe Szachy</strong> to turowa gra strategiczna dla
@@ -3164,6 +3210,7 @@
         sentinelShields: [],
         lastMove: null,
         evalBefore: 0,
+        movesWithoutAttack: 0,
       };
 
       // Tarcza Sentinela - specjalna figura tworzona przez dwie wieże w linii
@@ -4047,6 +4094,7 @@
           moveHistory: [],
           gameOver: false,
           inCheck: null,
+          movesWithoutAttack: 0,
         });
         document.getElementById("move-log").innerHTML = "";
         document.getElementById("analysis-controls").style.display = "none";
@@ -4403,10 +4451,7 @@
               pieceEl.className = "piece " + piece.color;
               if (isPieceAttacking(x, y)) {
                 pieceEl.classList.add("attacking");
-              }
-              // Sprawdź czy figura jest atakowana (w pendingCaptures)
-              if (isPieceLocked(x, y)) {
-                pieceEl.classList.add("under-attack");
+                pieceEl.classList.add("is-attacker"); // Żółte pulsowanie dla atakującego
               }
               if (piece.frozenTurns && piece.frozenTurns > 0) {
                 pieceEl.classList.add("frozen");
@@ -4885,7 +4930,42 @@
         whiteScore += blackMateScore; // Jeśli czarny blisko mata = bonus dla białego
         blackScore += whiteMateScore; // Jeśli biały blisko mata = bonus dla czarnego
 
-        return whiteScore - blackScore;
+        var finalEval = whiteScore - blackScore;
+
+        // ===== OCENA BLISKOŚCI REMISU =====
+        // Im bliżej remisu, tym bardziej eval zbliża się do 0
+        var drawProximity = getDrawProximity();
+        if (drawProximity > 0) {
+          // drawProximity = 0-1, gdzie 1 = remis
+          // Zmniejszamy eval proporcjonalnie do bliskości remisu
+          finalEval = finalEval * (1 - drawProximity * 0.9);
+        }
+
+        return finalEval;
+      }
+
+      // Oblicz jak blisko jest do remisu (0 = daleko, 1 = remis)
+      function getDrawProximity() {
+        var maxProximity = 0;
+
+        // 1. Ruchy bez ataku (10 = remis)
+        var attackDrawProximity = G.movesWithoutAttack / 10;
+        if (attackDrawProximity > maxProximity)
+          maxProximity = attackDrawProximity;
+
+        // 2. Pogromca nieaktywny (4 tury = remis)
+        for (var y = 0; y < 8; y++) {
+          for (var x = 0; x < 8; x++) {
+            var p = G.board[y][x];
+            if (p && p.kills && p.kills >= 3 && p.turnsUnused) {
+              var slayerDrawProximity = p.turnsUnused / 4;
+              if (slayerDrawProximity > maxProximity)
+                maxProximity = slayerDrawProximity;
+            }
+          }
+        }
+
+        return Math.min(maxProximity, 1);
       }
 
       // Ocena jak blisko dany kolor jest do bycia zamatowanym
@@ -5573,6 +5653,7 @@
 
       function finishMove(startPos, endPos, piece, targetPiece, moveColor) {
         var moveDesc = "";
+        var madeAttack = false; // Czy ten ruch to atak?
 
         var wasLocked = isPieceLocked(startPos.x, startPos.y);
         if (wasLocked) {
@@ -5596,6 +5677,7 @@
           targetPiece &&
           targetPiece.color !== piece.color
         ) {
+          madeAttack = true;
           // Zamroź ofiarę
           if (!targetPiece.frozenTurns) targetPiece.frozenTurns = 0;
           targetPiece.frozenTurns = 2;
@@ -5606,6 +5688,7 @@
           // Ale musimy usunąć tymczasową figurę
           G.board[startPos.y][startPos.x] = null;
         } else if (targetPiece && targetPiece.color !== piece.color) {
+          madeAttack = true;
           // Ofiara Phantom - natychmiastowe zbicie (Phantom nie może uciec)
           if (targetPiece.type === "queen") {
             (targetPiece.color === "white"
@@ -5613,6 +5696,10 @@
               : G.capturedByWhite
             ).push(targetPiece);
             G.board[endPos.y][endPos.x] = piece;
+            // Licznik zbić
+            if (!piece.kills) piece.kills = 0;
+            piece.kills++;
+            piece.turnsUnused = 0;
             moveDesc =
               moveDesc || piece.symbol + " zbija " + targetPiece.symbol + "!";
           }
@@ -5658,6 +5745,8 @@
             G.board[startPos.y][startPos.x] = null; // Usuń tymczasowego strażnika
           } else {
             G.board[endPos.y][endPos.x] = piece;
+            // Reset turnsUnused bo figura się ruszyła
+            piece.turnsUnused = 0;
             moveDesc =
               moveDesc ||
               piece.symbol +
@@ -5725,6 +5814,19 @@
         // Zapisz stan przed processPendingCaptures
         saveGameState(moveDesc, moveColor);
 
+        // Licznik ruchów bez ataku (dla automatycznego remisu)
+        if (madeAttack) {
+          G.movesWithoutAttack = 0;
+        } else {
+          G.movesWithoutAttack++;
+
+          // Remis po 10 ruchach bez ataku (5 pełnych rund)
+          if (G.movesWithoutAttack >= 10 && G.pendingCaptures.length === 0) {
+            endGame(null, "pat");
+            return;
+          }
+        }
+
         processPendingCaptures();
         switchTurn();
       }
@@ -5770,6 +5872,15 @@
               ).push(targetPiece);
               G.board[firstAttack.targetY][firstAttack.targetX] =
                 firstAttack.attackerPiece;
+
+              // Licznik zbić dla atakującego
+              var attackerOnBoard =
+                G.board[firstAttack.targetY][firstAttack.targetX];
+              if (attackerOnBoard) {
+                if (!attackerOnBoard.kills) attackerOnBoard.kills = 0;
+                attackerOnBoard.kills++;
+                attackerOnBoard.turnsUnused = 0;
+              }
 
               // Usuń pierwszego atakującego z jego pozycji
               if (
@@ -5843,6 +5954,15 @@
                 : G.capturedByWhite
               ).push(targetPiece);
               G.board[cap.targetY][cap.targetX] = cap.attackerPiece;
+
+              // Licznik zbić dla atakującego
+              var attackerOnBoard = G.board[cap.targetY][cap.targetX];
+              if (attackerOnBoard) {
+                if (!attackerOnBoard.kills) attackerOnBoard.kills = 0;
+                attackerOnBoard.kills++;
+                attackerOnBoard.turnsUnused = 0;
+              }
+
               if (
                 G.board[cap.attackerY] &&
                 G.board[cap.attackerY][cap.attackerX] &&
@@ -5876,6 +5996,25 @@
         }
       }
 
+      // Sprawdź warunek remisu "pogromcy" - figura z 3+ zbiciami nieużywana przez 4 tury
+      function checkSlayerDrawCondition() {
+        for (var y = 0; y < 8; y++) {
+          for (var x = 0; x < 8; x++) {
+            var p = G.board[y][x];
+            if (
+              p &&
+              p.kills &&
+              p.kills >= 3 &&
+              p.turnsUnused &&
+              p.turnsUnused >= 4
+            ) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
       function switchTurn() {
         G.currentPlayer = G.currentPlayer === "white" ? "black" : "white";
 
@@ -5883,18 +6022,27 @@
         checkSentinelShields();
 
         // Odliczaj zamrożenie figur aktualnego gracza
+        // Zwiększaj turnsUnused dla figur z 3+ zbiciami
         for (var y = 0; y < 8; y++) {
           for (var x = 0; x < 8; x++) {
             var p = G.board[y][x];
-            if (
-              p &&
-              p.color === G.currentPlayer &&
-              p.frozenTurns &&
-              p.frozenTurns > 0
-            ) {
-              p.frozenTurns--;
+            if (p && p.color === G.currentPlayer) {
+              if (p.frozenTurns && p.frozenTurns > 0) {
+                p.frozenTurns--;
+              }
+              // Zwiększ licznik nieużywania dla figur z 3+ zbiciami
+              if (p.kills && p.kills >= 3) {
+                if (p.turnsUnused === undefined) p.turnsUnused = 0;
+                p.turnsUnused++;
+              }
             }
           }
+        }
+
+        // Sprawdź remis "pogromcy" - figura z 3+ zbiciami nieużywana przez 4 tury
+        if (checkSlayerDrawCondition()) {
+          endGame(null, "slayer");
+          return;
         }
 
         // Sprawdź czy Nexus jest zablokowany i czy ma gdzie uciec
@@ -6171,6 +6319,14 @@
           addElo(lossPenalty, "Przegrana");
         }
 
+        // Remis = +30 ELO dla każdego
+        if (
+          (type === "pat" || type === "slayer") &&
+          (G.gameMode === "bot" || G.gameMode === "online")
+        ) {
+          addElo(30, "Remis");
+        }
+
         var title, message;
         if (type === "mat") {
           title = "SZACH MAT!";
@@ -6181,9 +6337,15 @@
         } else if (type === "poddanie") {
           title = "PODDANIE!";
           message = (winner === "white" ? "Białe" : "Czarne") + " wygrywają!";
+        } else if (type === "slayer") {
+          title = "REMIS!";
+          message = "Pogromca nieaktywny przez 4 tury!";
         } else {
-          title = "PAT!";
-          message = "Remis!";
+          title = "REMIS!";
+          message =
+            G.movesWithoutAttack >= 10
+              ? "10 ruchów bez ataku!"
+              : "Gracze zgodzili się na remis";
         }
 
         document.getElementById("modal-title").textContent = title;
