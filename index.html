@@ -434,22 +434,31 @@
       .eval-toggle {
         writing-mode: vertical-rl;
         text-orientation: mixed;
-        font-size: 0.7rem;
+        font-size: 0.9rem;
         color: var(--text-secondary);
         display: flex;
         align-items: center;
-        margin-left: -5px;
+        margin-left: -3px;
+        background: var(--bg-medium);
+        padding: 8px 4px;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
       }
       .eval-toggle label {
         display: flex;
         align-items: center;
-        gap: 5px;
+        gap: 8px;
         cursor: pointer;
         white-space: nowrap;
       }
       .eval-toggle input {
-        width: 12px;
-        height: 12px;
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+      }
+      .eval-toggle:hover {
+        background: var(--bg-light);
+        border-color: var(--accent-cyan);
       }
       .eval-white {
         background: var(--white-piece);
@@ -2395,6 +2404,17 @@
               właściciela, gra kończy się remisem.
             </p>
             <p>
+              • <strong>Potrójne powtórzenie:</strong> Jeśli ta sama figura
+              stanie na tym samym polu <strong>3 razy</strong> w ciągu partii
+              (nie musi być z rzędu), gra kończy się remisem.
+            </p>
+            <p>
+              • <strong>Nexus zablokowany przez własne figury:</strong> Jeśli
+              Nexus jest pod szachem i wszystkie pola wokół niego (oprócz pola
+              atakującego) są zajęte przez <strong>własne figury</strong>, gra
+              kończy się remisem (nie matem!).
+            </p>
+            <p>
               • <strong>Propozycja remisu:</strong> W trybie online gracze mogą
               zaproponować remis. Jeśli przeciwnik zaakceptuje, gra kończy się
               remisem.
@@ -3286,6 +3306,7 @@
         evalBefore: 0,
         movesWithoutAttack: 0,
         doubleAttackPieces: [],
+        piecePositionHistory: {},
       };
 
       // ===== SYSTEM DŹWIĘKÓW (jak chess.com) =====
@@ -4338,6 +4359,7 @@
           gameOver: false,
           inCheck: null,
           movesWithoutAttack: 0,
+          piecePositionHistory: {},
         });
         document.getElementById("move-log").innerHTML = "";
         document.getElementById("analysis-controls").style.display = "none";
@@ -5239,7 +5261,75 @@
           }
         }
 
+        // 3. Potrójne powtórzenie pozycji (3 = remis)
+        for (var uid in G.piecePositionHistory) {
+          for (var posKey in G.piecePositionHistory[uid]) {
+            var count = G.piecePositionHistory[uid][posKey];
+            if (count >= 2) {
+              var repetitionProximity = count / 3;
+              if (repetitionProximity > maxProximity)
+                maxProximity = repetitionProximity;
+            }
+          }
+        }
+
+        // 4. Nexus zablokowany przez własne figury przy szachu
+        if (G.inCheck) {
+          var ownBlockProximity = getOwnBlockProximity(G.inCheck);
+          if (ownBlockProximity > maxProximity)
+            maxProximity = ownBlockProximity;
+        }
+
         return Math.min(maxProximity, 1);
+      }
+
+      // Sprawdź jak blisko jest Nexus do bycia zablokowanym przez własne figury
+      function getOwnBlockProximity(kingColor) {
+        // Znajdź Nexusa
+        var kingX = -1,
+          kingY = -1;
+        for (var y = 0; y < 8; y++) {
+          for (var x = 0; x < 8; x++) {
+            var p = G.board[y][x];
+            if (p && p.type === "king" && p.color === kingColor) {
+              kingX = x;
+              kingY = y;
+              break;
+            }
+          }
+          if (kingX >= 0) break;
+        }
+        if (kingX < 0) return 0;
+
+        var directions = [
+          { dx: 0, dy: -1 },
+          { dx: 0, dy: 1 },
+          { dx: -1, dy: 0 },
+          { dx: 1, dy: 0 },
+          { dx: -1, dy: -1 },
+          { dx: 1, dy: -1 },
+          { dx: -1, dy: 1 },
+          { dx: 1, dy: 1 },
+        ];
+
+        var ownPiecesAround = 0;
+        var totalAdjacent = 0;
+
+        for (var i = 0; i < directions.length; i++) {
+          var nx = kingX + directions[i].dx;
+          var ny = kingY + directions[i].dy;
+          if (nx < 0 || nx > 7 || ny < 0 || ny > 7) continue;
+
+          totalAdjacent++;
+          var pieceAtPos = G.board[ny][nx];
+          if (pieceAtPos && pieceAtPos.color === kingColor) {
+            ownPiecesAround++;
+          }
+        }
+
+        // Im więcej własnych figur wokół Nexusa, tym bliżej do tego remisu
+        if (totalAdjacent === 0) return 0;
+        return (ownPiecesAround / totalAdjacent) * 0.8; // Max 0.8 bo potrzebny jeszcze szach
       }
 
       // Ocena jak blisko dany kolor jest do bycia zamatowanym
@@ -6026,6 +6116,13 @@
             G.board[endPos.y][endPos.x] = piece;
             // Reset turnsUnused bo figura się ruszyła
             piece.turnsUnused = 0;
+
+            // Śledź historię pozycji figury (dla potrójnego powtórzenia)
+            if (checkTripleRepetition(piece, endPos.x, endPos.y)) {
+              endGame(null, "repetition");
+              return;
+            }
+
             moveDesc =
               moveDesc ||
               piece.symbol +
@@ -6318,6 +6415,86 @@
         return false;
       }
 
+      // Sprawdź potrójne powtórzenie pozycji figury
+      function checkTripleRepetition(piece, x, y) {
+        // Utwórz unikalny identyfikator figury
+        if (!piece.uid) {
+          piece.uid =
+            piece.color +
+            "_" +
+            piece.type +
+            "_" +
+            Math.random().toString(36).substr(2, 9);
+        }
+
+        var posKey = x + "," + y;
+
+        if (!G.piecePositionHistory[piece.uid]) {
+          G.piecePositionHistory[piece.uid] = {};
+        }
+
+        if (!G.piecePositionHistory[piece.uid][posKey]) {
+          G.piecePositionHistory[piece.uid][posKey] = 0;
+        }
+
+        G.piecePositionHistory[piece.uid][posKey]++;
+
+        // Jeśli ta sama figura stanęła na tym samym polu 3 razy = remis
+        if (G.piecePositionHistory[piece.uid][posKey] >= 3) {
+          return true;
+        }
+
+        return false;
+      }
+
+      // Sprawdź czy Nexus jest zablokowany przez własne figury przy szachu (remis)
+      function checkStalemateByOwnPieces(
+        kingX,
+        kingY,
+        kingColor,
+        attackerX,
+        attackerY
+      ) {
+        var directions = [
+          { dx: 0, dy: -1 },
+          { dx: 0, dy: 1 },
+          { dx: -1, dy: 0 },
+          { dx: 1, dy: 0 },
+          { dx: -1, dy: -1 },
+          { dx: 1, dy: -1 },
+          { dx: -1, dy: 1 },
+          { dx: 1, dy: 1 },
+        ];
+
+        var blockedByOwn = 0;
+        var totalAdjacent = 0;
+
+        for (var i = 0; i < directions.length; i++) {
+          var nx = kingX + directions[i].dx;
+          var ny = kingY + directions[i].dy;
+
+          // Poza planszą - nie liczymy
+          if (nx < 0 || nx > 7 || ny < 0 || ny > 7) continue;
+
+          // Pole atakującego - nie liczymy (to jest dozwolone)
+          if (nx === attackerX && ny === attackerY) continue;
+
+          totalAdjacent++;
+
+          var pieceAtPos = G.board[ny][nx];
+          if (pieceAtPos && pieceAtPos.color === kingColor) {
+            blockedByOwn++;
+          }
+        }
+
+        // Jeśli wszystkie sąsiednie pola (oprócz atakującego) są zablokowane przez własne figury = remis
+        if (totalAdjacent > 0 && blockedByOwn === totalAdjacent) {
+          return true;
+        }
+
+        return false;
+      }
+
       function switchTurn() {
         G.currentPlayer = G.currentPlayer === "white" ? "black" : "white";
 
@@ -6363,6 +6540,20 @@
               target.type === "king" &&
               target.color === G.currentPlayer
             ) {
+              // Sprawdź czy Nexus jest zablokowany przez WŁASNE figury (remis)
+              if (
+                checkStalemateByOwnPieces(
+                  cap.targetX,
+                  cap.targetY,
+                  target.color,
+                  cap.attackerX,
+                  cap.attackerY
+                )
+              ) {
+                endGame(null, "ownblock");
+                return;
+              }
+
               // Nexus jest zablokowany - sprawdź czy ma bezpieczne pola do ucieczki
               var nexusMoves = getAllMovesForPiece(
                 cap.targetX,
@@ -6626,10 +6817,12 @@
         }
 
         // Remis = +30 ELO dla każdego
-        if (
-          (type === "pat" || type === "slayer") &&
-          (G.gameMode === "bot" || G.gameMode === "online")
-        ) {
+        var isDrawType =
+          type === "pat" ||
+          type === "slayer" ||
+          type === "repetition" ||
+          type === "ownblock";
+        if (isDrawType && (G.gameMode === "bot" || G.gameMode === "online")) {
           addElo(30, "Remis");
         }
 
@@ -6646,6 +6839,12 @@
         } else if (type === "slayer") {
           title = "REMIS!";
           message = "Pogromca nieaktywny przez 4 tury!";
+        } else if (type === "repetition") {
+          title = "REMIS!";
+          message = "Potrójne powtórzenie pozycji figury!";
+        } else if (type === "ownblock") {
+          title = "REMIS!";
+          message = "Nexus zablokowany przez własne figury!";
         } else {
           title = "REMIS!";
           message =
