@@ -419,6 +419,7 @@
         display: flex;
         align-items: stretch;
         gap: 10px;
+        flex-direction: row;
       }
       .eval-bar {
         width: 25px;
@@ -429,6 +430,26 @@
         overflow: hidden;
         display: flex;
         flex-direction: column;
+      }
+      .eval-toggle {
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        font-size: 0.7rem;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        margin-left: -5px;
+      }
+      .eval-toggle label {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .eval-toggle input {
+        width: 12px;
+        height: 12px;
       }
       .eval-white {
         background: var(--white-piece);
@@ -834,6 +855,21 @@
         50% {
           background: rgba(255, 200, 0, 0.7);
           box-shadow: 0 0 25px rgba(255, 200, 0, 0.9);
+        }
+      }
+      /* Figura która brała udział w podwójnym ataku - zielone świecenie */
+      .piece.double-attacker {
+        animation: doubleAttackPulse 1s infinite ease-in-out;
+      }
+      @keyframes doubleAttackPulse {
+        0%,
+        100% {
+          background: rgba(0, 255, 100, 0.4);
+          box-shadow: 0 0 15px rgba(0, 255, 100, 0.6);
+        }
+        50% {
+          background: rgba(0, 255, 100, 0.8);
+          box-shadow: 0 0 30px rgba(0, 255, 100, 1);
         }
       }
       /* Online / Profil */
@@ -2149,6 +2185,12 @@
                 <div class="eval-marker" id="eval-marker"></div>
                 <div class="eval-value" id="eval-value">0.0</div>
               </div>
+              <div class="eval-toggle">
+                <label
+                  ><input type="checkbox" id="show-eval" checked /> Pokaż pasek
+                  szans</label
+                >
+              </div>
               <div class="board-wrapper" id="board-wrapper">
                 <div class="board-labels board-label-top">
                   <span>a</span><span>b</span><span>c</span><span>d</span
@@ -2312,8 +2354,9 @@
             </p>
             <p>
               • <strong>10 ruchów bez ataku:</strong> Jeśli przez 10 kolejnych
-              ruchów (5 pełnych rund) żaden gracz nie zaatakuje żadnej figury i
-              nie ma aktywnych blokad, gra kończy się remisem.
+              ruchów żaden gracz nie zaatakuje żadnej figury i nie ma aktywnych
+              blokad, gra kończy się remisem. <strong>Uwaga:</strong> Ruchy
+              pionkami (Shard) nie są liczone do tego limitu!
             </p>
             <p>
               • <strong>Pogromca nieaktywny:</strong> Jeśli figura lub pionek,
@@ -3190,6 +3233,7 @@
         gameOver: false,
         inCheck: null,
         showZones: true,
+        showEval: true,
         timeLimit: 0,
         increment: 0,
         whiteTime: 0,
@@ -3211,7 +3255,150 @@
         lastMove: null,
         evalBefore: 0,
         movesWithoutAttack: 0,
+        doubleAttackPieces: [],
       };
+
+      // ===== SYSTEM DŹWIĘKÓW (jak chess.com) =====
+      var audioContext = null;
+      var soundEnabled = true;
+
+      function initAudio() {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext ||
+            window.webkitAudioContext)();
+        }
+      }
+
+      function playSound(type) {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          var osc = audioContext.createOscillator();
+          var gain = audioContext.createGain();
+          osc.connect(gain);
+          gain.connect(audioContext.destination);
+
+          var now = audioContext.currentTime;
+
+          switch (type) {
+            case "move":
+              // Krótki "klik" - ruch figury
+              osc.type = "sine";
+              osc.frequency.setValueAtTime(600, now);
+              osc.frequency.exponentialRampToValueAtTime(400, now + 0.08);
+              gain.gain.setValueAtTime(0.3, now);
+              gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+              osc.start(now);
+              osc.stop(now + 0.1);
+              break;
+
+            case "capture":
+              // Głębszy dźwięk zbicia
+              osc.type = "triangle";
+              osc.frequency.setValueAtTime(300, now);
+              osc.frequency.exponentialRampToValueAtTime(100, now + 0.15);
+              gain.gain.setValueAtTime(0.4, now);
+              gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+              osc.start(now);
+              osc.stop(now + 0.2);
+              break;
+
+            case "check":
+              // Ostrzegawczy dźwięk szacha
+              osc.type = "square";
+              osc.frequency.setValueAtTime(800, now);
+              osc.frequency.setValueAtTime(600, now + 0.1);
+              osc.frequency.setValueAtTime(800, now + 0.2);
+              gain.gain.setValueAtTime(0.25, now);
+              gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+              osc.start(now);
+              osc.stop(now + 0.3);
+              break;
+
+            case "castle":
+              // Podwójny klik (roszada / tarcza)
+              osc.type = "sine";
+              osc.frequency.setValueAtTime(500, now);
+              osc.frequency.setValueAtTime(700, now + 0.08);
+              gain.gain.setValueAtTime(0.3, now);
+              gain.gain.setValueAtTime(0.3, now + 0.08);
+              gain.gain.exponentialRampToValueAtTime(0.01, now + 0.16);
+              osc.start(now);
+              osc.stop(now + 0.16);
+              break;
+
+            case "promote":
+              // Triumfalny dźwięk promocji
+              osc.type = "sine";
+              osc.frequency.setValueAtTime(400, now);
+              osc.frequency.exponentialRampToValueAtTime(800, now + 0.15);
+              osc.frequency.exponentialRampToValueAtTime(1000, now + 0.25);
+              gain.gain.setValueAtTime(0.3, now);
+              gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+              osc.start(now);
+              osc.stop(now + 0.35);
+              break;
+
+            case "illegal":
+              // Błąd - nielegalny ruch
+              osc.type = "sawtooth";
+              osc.frequency.setValueAtTime(200, now);
+              osc.frequency.setValueAtTime(150, now + 0.1);
+              gain.gain.setValueAtTime(0.2, now);
+              gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+              osc.start(now);
+              osc.stop(now + 0.15);
+              break;
+
+            case "select":
+              // Zaznaczenie figury
+              osc.type = "sine";
+              osc.frequency.setValueAtTime(500, now);
+              osc.frequency.exponentialRampToValueAtTime(600, now + 0.05);
+              gain.gain.setValueAtTime(0.15, now);
+              gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+              osc.start(now);
+              osc.stop(now + 0.08);
+              break;
+
+            case "gameEnd":
+              // Koniec gry
+              osc.type = "sine";
+              osc.frequency.setValueAtTime(400, now);
+              osc.frequency.setValueAtTime(500, now + 0.15);
+              osc.frequency.setValueAtTime(300, now + 0.3);
+              osc.frequency.setValueAtTime(400, now + 0.45);
+              gain.gain.setValueAtTime(0.3, now);
+              gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+              osc.start(now);
+              osc.stop(now + 0.6);
+              break;
+
+            case "notify":
+              // Powiadomienie (propozycja remisu itp)
+              osc.type = "sine";
+              osc.frequency.setValueAtTime(700, now);
+              osc.frequency.setValueAtTime(900, now + 0.1);
+              gain.gain.setValueAtTime(0.2, now);
+              gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+              osc.start(now);
+              osc.stop(now + 0.2);
+              break;
+
+            case "lowTime":
+              // Ostrzeżenie o niskim czasie
+              osc.type = "square";
+              osc.frequency.setValueAtTime(1000, now);
+              gain.gain.setValueAtTime(0.15, now);
+              gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+              osc.start(now);
+              osc.stop(now + 0.05);
+              break;
+          }
+        } catch (e) {
+          console.log("Audio error:", e);
+        }
+      }
 
       // Tarcza Sentinela - specjalna figura tworzona przez dwie wieże w linii
       const SENTINEL_GUARDIAN = {
@@ -3796,6 +3983,7 @@
         var text = document.getElementById("draw-modal-text");
         text.textContent = fromPlayer + " proponuje remis";
         modal.classList.add("active");
+        playSound("notify");
       }
 
       function acceptDraw() {
@@ -4292,6 +4480,7 @@
 
       function startTimer() {
         if (G.timerInterval) clearInterval(G.timerInterval);
+        var lastLowTimeSound = 0;
         G.timerInterval = setInterval(function () {
           if (G.gameOver) {
             clearInterval(G.timerInterval);
@@ -4299,6 +4488,16 @@
           }
           if (G.currentPlayer === "white") {
             G.whiteTime--;
+            // Dźwięk niskiego czasu co 10 sekund
+            if (
+              G.whiteTime <= 30 &&
+              G.whiteTime > 0 &&
+              G.whiteTime % 10 === 0 &&
+              G.whiteTime !== lastLowTimeSound
+            ) {
+              lastLowTimeSound = G.whiteTime;
+              playSound("lowTime");
+            }
             if (G.whiteTime <= 0) {
               G.whiteTime = 0;
               clearInterval(G.timerInterval);
@@ -4306,6 +4505,16 @@
             }
           } else {
             G.blackTime--;
+            // Dźwięk niskiego czasu co 10 sekund
+            if (
+              G.blackTime <= 30 &&
+              G.blackTime > 0 &&
+              G.blackTime % 10 === 0 &&
+              G.blackTime !== lastLowTimeSound
+            ) {
+              lastLowTimeSound = G.blackTime;
+              playSound("lowTime");
+            }
             if (G.blackTime <= 0) {
               G.blackTime = 0;
               clearInterval(G.timerInterval);
@@ -4452,6 +4661,16 @@
               if (isPieceAttacking(x, y)) {
                 pieceEl.classList.add("attacking");
                 pieceEl.classList.add("is-attacker"); // Żółte pulsowanie dla atakującego
+              }
+              // Sprawdź czy figura brała udział w podwójnym ataku
+              for (var da = 0; da < G.doubleAttackPieces.length; da++) {
+                if (
+                  G.doubleAttackPieces[da].x === x &&
+                  G.doubleAttackPieces[da].y === y
+                ) {
+                  pieceEl.classList.add("double-attacker");
+                  break;
+                }
               }
               if (piece.frozenTurns && piece.frozenTurns > 0) {
                 pieceEl.classList.add("frozen");
@@ -5463,6 +5682,7 @@
           G.selectedPiece = { x: x, y: y };
           G.plannedPath = [{ x: x, y: y }];
           G.usedDiagonal = false;
+          playSound("select");
           renderBoard();
           updateUI();
         }
@@ -5702,6 +5922,7 @@
             piece.turnsUnused = 0;
             moveDesc =
               moveDesc || piece.symbol + " zbija " + targetPiece.symbol + "!";
+            playSound("capture");
           }
           // Nexus jako ofiara - 1 tura na ucieczkę
           else if (targetPiece.type === "king") {
@@ -5720,6 +5941,7 @@
             G.board[startPos.y][startPos.x] = piece;
             moveDesc =
               moveDesc || piece.symbol + " blokuje " + targetPiece.symbol + "!";
+            playSound("check");
           }
           // Inne figury jako ofiara - 2 tury na ucieczkę
           else {
@@ -5737,12 +5959,14 @@
             G.board[startPos.y][startPos.x] = piece;
             moveDesc =
               moveDesc || piece.symbol + " blokuje " + targetPiece.symbol + "!";
+            playSound("capture");
           }
         } else {
           // Strażnik nie może się ruszać bez ataku - tylko zamraża
           if (piece.isGuardian) {
             // Nic nie rób - strażnik wraca na miejsce
             G.board[startPos.y][startPos.x] = null; // Usuń tymczasowego strażnika
+            playSound("castle");
           } else {
             G.board[endPos.y][endPos.x] = piece;
             // Reset turnsUnused bo figura się ruszyła
@@ -5763,6 +5987,9 @@
             ) {
               Object.assign(piece, PIECES.QUEEN, { color: piece.color });
               moveDesc += " (Promocja!)";
+              playSound("promote");
+            } else {
+              playSound("move");
             }
           }
         }
@@ -5815,17 +6042,20 @@
         saveGameState(moveDesc, moveColor);
 
         // Licznik ruchów bez ataku (dla automatycznego remisu)
+        // Ruchy pionkami (Shard) nie liczą się do tego licznika
         if (madeAttack) {
           G.movesWithoutAttack = 0;
-        } else {
+        } else if (piece.type !== "pawn") {
+          // Tylko ruchy NIE-pionkami zwiększają licznik
           G.movesWithoutAttack++;
 
-          // Remis po 10 ruchach bez ataku (5 pełnych rund)
+          // Remis po 10 ruchach bez ataku (nie licząc pionków)
           if (G.movesWithoutAttack >= 10 && G.pendingCaptures.length === 0) {
             endGame(null, "pat");
             return;
           }
         }
+        // Ruchy pionkami nie zmieniają licznika
 
         processPendingCaptures();
         switchTurn();
@@ -5907,6 +6137,24 @@
                 targetPiece.symbol +
                 "!";
               captureColor = firstAttack.attackerColor;
+
+              // Zapisz pozycje atakujących do podświetlenia na zielono
+              G.doubleAttackPieces = [];
+              attackCounts[key].forEach(function (cap, index) {
+                if (index === 0) {
+                  // Pierwszy atakujący wszedł na miejsce ofiary
+                  G.doubleAttackPieces.push({
+                    x: firstAttack.targetX,
+                    y: firstAttack.targetY,
+                  });
+                } else {
+                  // Pozostali zostali na swoich pozycjach
+                  G.doubleAttackPieces.push({
+                    x: cap.attackerX,
+                    y: cap.attackerY,
+                  });
+                }
+              });
 
               // Oznacz te ataki jako zakończone
               attackCounts[key].forEach(function (cap) {
@@ -6017,6 +6265,9 @@
 
       function switchTurn() {
         G.currentPlayer = G.currentPlayer === "white" ? "black" : "white";
+
+        // Wyczyść podświetlenie podwójnego ataku
+        G.doubleAttackPieces = [];
 
         // Sprawdź Tarcze Sentineli
         checkSentinelShields();
@@ -6351,6 +6602,7 @@
         document.getElementById("modal-title").textContent = title;
         document.getElementById("modal-message").textContent = message;
         document.getElementById("game-over-modal").classList.add("active");
+        playSound("gameEnd");
       }
 
       function makeBotMove() {
@@ -7067,6 +7319,15 @@
         .addEventListener("change", function () {
           G.showZones = this.checked;
           renderBoard();
+        });
+      document
+        .getElementById("show-eval")
+        .addEventListener("change", function () {
+          G.showEval = this.checked;
+          var evalBar = document.getElementById("eval-bar");
+          if (evalBar) {
+            evalBar.style.display = this.checked ? "block" : "none";
+          }
         });
       document
         .getElementById("btn-first")
