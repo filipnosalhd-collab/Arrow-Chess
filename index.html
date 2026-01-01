@@ -909,6 +909,27 @@
         background: var(--bg-medium);
         border: 1px solid var(--accent-gold);
       }
+      .opponent-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: "Orbitron", monospace;
+        font-size: 0.85rem;
+        padding: 5px 12px;
+        background: var(--bg-medium);
+        border: 1px solid var(--accent-magenta);
+      }
+      .vs-text {
+        color: var(--text-secondary);
+        font-size: 0.7rem;
+      }
+      .opponent-name {
+        color: var(--accent-magenta);
+      }
+      .opponent-elo {
+        color: var(--accent-gold);
+        font-size: 0.75rem;
+      }
       .elo-toast {
         position: fixed;
         top: 60px;
@@ -958,6 +979,10 @@
           padding: 3px 8px;
         }
         .elo-display {
+          font-size: 0.6rem;
+          padding: 3px 8px;
+        }
+        .opponent-info {
           font-size: 0.6rem;
           padding: 3px 8px;
         }
@@ -1929,6 +1954,11 @@
           ⚙ Ustaw profil
         </div>
         <div class="elo-display" id="elo-display">⭐ 0 ELO</div>
+        <div class="opponent-info" id="opponent-info" style="display: none">
+          <span class="vs-text">vs</span>
+          <span class="opponent-name" id="opponent-name">-</span>
+          <span class="opponent-elo" id="opponent-elo">⭐ 0</span>
+        </div>
       </div>
 
       <!-- Toast zmiany ELO -->
@@ -3785,6 +3815,7 @@
         onlinePlayers = [];
         myColor = null;
         G.gameMode = null;
+        document.getElementById("opponent-info").style.display = "none";
         showScreen("menu");
       }
 
@@ -3802,8 +3833,29 @@
         G.gameMode = "online";
         G.timeLimit = lobbyTimeLimit;
         G.increment = lobbyIncrement;
+        updateOpponentDisplay();
         resetGame();
         showScreen("game");
+      }
+
+      // Wyświetl dane przeciwnika w trybie online
+      function updateOpponentDisplay() {
+        var opponentInfo = document.getElementById("opponent-info");
+        if (G.gameMode === "online" && onlinePlayers.length >= 2) {
+          // Znajdź przeciwnika (nie nas)
+          var opponent = onlinePlayers.find(function (p) {
+            return p.name !== playerProfile;
+          });
+          if (opponent) {
+            document.getElementById("opponent-name").textContent =
+              opponent.name;
+            document.getElementById("opponent-elo").textContent =
+              "⭐ " + (opponent.elo || 0);
+            opponentInfo.style.display = "flex";
+          }
+        } else {
+          opponentInfo.style.display = "none";
+        }
       }
 
       // Sprawdzanie URL przy starcie
@@ -3850,8 +3902,8 @@
             console.log("Połączono z hostem!");
             document.getElementById("waiting-text").textContent =
               "Połączono! Wysyłanie danych...";
-            // Wyślij swoje dane
-            sendPeerData({ type: "join", name: playerProfile });
+            // Wyślij swoje dane z ELO
+            sendPeerData({ type: "join", name: playerProfile, elo: playerElo });
           });
 
           peerConnection.on("data", function (data) {
@@ -3914,14 +3966,15 @@
           case "join":
             // Gość dołączył (tylko host otrzymuje)
             onlinePlayers = [
-              { name: playerProfile, isHost: true },
-              { name: data.name, isHost: false },
+              { name: playerProfile, isHost: true, elo: playerElo },
+              { name: data.name, isHost: false, elo: data.elo || 0 },
             ];
             updateLobbyUI();
-            // Potwierdź dołączenie i wyślij ustawienia
+            // Potwierdź dołączenie i wyślij ustawienia + ELO
             sendPeerData({
               type: "joined",
               hostName: playerProfile,
+              hostElo: playerElo,
               timeLimit: lobbyTimeLimit,
               increment: lobbyIncrement,
             });
@@ -3930,8 +3983,8 @@
           case "joined":
             // Potwierdzenie od hosta (tylko gość otrzymuje)
             onlinePlayers = [
-              { name: data.hostName, isHost: true },
-              { name: playerProfile, isHost: false },
+              { name: data.hostName, isHost: true, elo: data.hostElo || 0 },
+              { name: playerProfile, isHost: false, elo: playerElo },
             ];
             // Wyświetl ustawienia hosta
             var timeDisplay = document.getElementById("lobby-time-display");
@@ -3947,6 +4000,8 @@
             G.gameMode = "online";
             G.timeLimit = data.timeLimit;
             G.increment = data.increment;
+            // Zapisz dane przeciwnika
+            updateOpponentDisplay();
             resetGame();
             showScreen("game");
             break;
@@ -7304,6 +7359,8 @@
             .querySelector('[data-screen="menu"]')
             .classList.add("active");
           document.getElementById("menu-screen").classList.add("active");
+          // Ukryj info o przeciwniku
+          document.getElementById("opponent-info").style.display = "none";
           // Reset menu selections
           document.getElementById("difficulty-select").style.display = "none";
           document.getElementById("time-select").style.display = "none";
