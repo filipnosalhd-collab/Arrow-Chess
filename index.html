@@ -1728,7 +1728,7 @@
                   🔬 Tryb "Co jeśli?" - testuj alternatywne ruchy
                 </div>
                 <div class="whatif-counter">
-                  Rundy: <span id="whatif-rounds">0</span>/3
+                  Rundy: <span id="whatif-rounds">0</span>
                 </div>
                 <button
                   class="analysis-btn reset-btn"
@@ -3296,6 +3296,9 @@
         G.whatIfPlayer = null;
         G.selectedPiece = null;
         G.plannedPath = [];
+        // Wyczyść strzałki analizy
+        analysisArrows = [];
+        analysisArrowStart = null;
         updateWhatIfDisplay();
         renderBoard();
         updateUI();
@@ -3305,28 +3308,12 @@
         var counter = document.getElementById("whatif-rounds");
         if (counter) {
           counter.textContent = G.whatIfRounds;
-          if (G.whatIfRounds >= 3) {
-            counter.parentElement.style.color = "var(--accent-magenta)";
-          } else {
-            counter.parentElement.style.color = "var(--accent-gold)";
-          }
         }
       }
 
       function executeWhatIfMove() {
-        if (G.whatIfRounds >= 4) {
-          resetWhatIfMode();
-          return;
-        }
         G.whatIfRounds++;
         updateWhatIfDisplay();
-
-        // Po 4 rundach automatyczny reset
-        if (G.whatIfRounds >= 4) {
-          setTimeout(function () {
-            resetWhatIfMode();
-          }, 500);
-        }
       }
 
       function formatTime(seconds) {
@@ -3536,13 +3523,104 @@
 
             // Kliknięcie - współrzędne są poprawne, CSS tylko obraca wizualnie
             (function (tx, ty) {
-              tile.addEventListener("click", function () {
-                handleTileClick(tx, ty);
+              tile.addEventListener("click", function (event) {
+                handleTileClick(tx, ty, event);
+              });
+              tile.addEventListener("mouseenter", function () {
+                handleTileHover(tx, ty);
               });
             })(x, y);
             boardEl.appendChild(tile);
           }
         }
+
+        // Renderuj strzałki analizy (SVG overlay)
+        renderAnalysisArrows();
+      }
+
+      function renderAnalysisArrows() {
+        // Usuń stary SVG
+        var oldSvg = document.getElementById("analysis-arrows-svg");
+        if (oldSvg) oldSvg.remove();
+
+        if (analysisArrows.length === 0) return;
+
+        var board = document.getElementById("board");
+        var wrapper = document.getElementById("board-wrapper");
+        var boardRect = board.getBoundingClientRect();
+        var wrapperRect = wrapper.getBoundingClientRect();
+        var tileSize = boardRect.width / 8;
+
+        // Offset board względem wrapper
+        var offsetX = boardRect.left - wrapperRect.left;
+        var offsetY = boardRect.top - wrapperRect.top;
+
+        // Czy plansza jest obrócona
+        var flipped = wrapper.classList.contains("rotated");
+
+        var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.id = "analysis-arrows-svg";
+        svg.style.position = "absolute";
+        svg.style.top = "0";
+        svg.style.left = "0";
+        svg.style.width = "100%";
+        svg.style.height = "100%";
+        svg.style.pointerEvents = "none";
+        svg.style.zIndex = "100";
+        if (flipped) {
+          svg.style.transform = "rotate(180deg)";
+        }
+
+        // Definicja strzałki
+        var defs = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "defs"
+        );
+        var marker = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "marker"
+        );
+        marker.setAttribute("id", "arrowhead");
+        marker.setAttribute("markerWidth", "10");
+        marker.setAttribute("markerHeight", "7");
+        marker.setAttribute("refX", "9");
+        marker.setAttribute("refY", "3.5");
+        marker.setAttribute("orient", "auto");
+        var polygon = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "polygon"
+        );
+        polygon.setAttribute("points", "0 0, 10 3.5, 0 7");
+        polygon.setAttribute("fill", "#ff6600");
+        marker.appendChild(polygon);
+        defs.appendChild(marker);
+        svg.appendChild(defs);
+
+        analysisArrows.forEach(function (arrow) {
+          var line = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line"
+          );
+
+          // Pozycje w pikselach - środek każdego pola
+          var x1 = offsetX + (arrow.fromX + 0.5) * tileSize;
+          var y1 = offsetY + (arrow.fromY + 0.5) * tileSize;
+          var x2 = offsetX + (arrow.toX + 0.5) * tileSize;
+          var y2 = offsetY + (arrow.toY + 0.5) * tileSize;
+
+          line.setAttribute("x1", x1);
+          line.setAttribute("y1", y1);
+          line.setAttribute("x2", x2);
+          line.setAttribute("y2", y2);
+          line.setAttribute("stroke", "#ff6600");
+          line.setAttribute("stroke-width", "8");
+          line.setAttribute("stroke-opacity", "0.85");
+          line.setAttribute("stroke-linecap", "round");
+          line.setAttribute("marker-end", "url(#arrowhead)");
+          svg.appendChild(line);
+        });
+
+        wrapper.appendChild(svg);
       }
 
       function updateUI() {
@@ -3725,15 +3803,95 @@
         return false;
       }
 
-      function handleTileClick(x, y) {
+      // Strzałki analizy (Shift+drag)
+      var analysisArrows = []; // [{fromX, fromY, toX, toY}, ...]
+      var analysisArrowStart = null; // {x, y} - początek rysowanej strzałki
+      var isShiftDown = false;
+      var lastHoveredTile = null; // Ostatnie pole pod myszką
+
+      // Nasłuchuj Shift
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Shift" && !isShiftDown) {
+          isShiftDown = true;
+          // Zacznij strzałkę od pola pod myszką
+          if (lastHoveredTile) {
+            analysisArrowStart = { x: lastHoveredTile.x, y: lastHoveredTile.y };
+          }
+        }
+      });
+
+      document.addEventListener("keyup", function (e) {
+        if (e.key === "Shift") {
+          // Zakończ strzałkę - zamień tymczasowe na stałe
+          if (isShiftDown && analysisArrowStart) {
+            analysisArrows = analysisArrows.map(function (a) {
+              if (a.temp) {
+                return {
+                  fromX: a.fromX,
+                  fromY: a.fromY,
+                  toX: a.toX,
+                  toY: a.toY,
+                };
+              }
+              return a;
+            });
+            analysisArrowStart = null;
+          }
+          isShiftDown = false;
+        }
+      });
+
+      function handleTileHover(x, y) {
+        lastHoveredTile = { x: x, y: y };
+
+        if (!isShiftDown) return;
+
+        if (!analysisArrowStart) {
+          // Początek strzałki
+          analysisArrowStart = { x: x, y: y };
+        } else if (analysisArrowStart.x !== x || analysisArrowStart.y !== y) {
+          // Aktualizuj lub dodaj strzałkę
+          // Usuń poprzednią tymczasową strzałkę z tego samego początku
+          analysisArrows = analysisArrows.filter(function (a) {
+            return !(
+              a.fromX === analysisArrowStart.x &&
+              a.fromY === analysisArrowStart.y &&
+              a.temp
+            );
+          });
+          // Dodaj nową tymczasową
+          analysisArrows.push({
+            fromX: analysisArrowStart.x,
+            fromY: analysisArrowStart.y,
+            toX: x,
+            toY: y,
+            temp: true,
+          });
+          renderAnalysisArrows();
+        }
+      }
+
+      function handleTileClick(x, y, event) {
+        // Jeśli Shift - nie rób nic (strzałki przez hover)
+        if (event && event.shiftKey) {
+          return;
+        }
+
+        // Normalny klik - usuń strzałki analizy
+        if (analysisArrows.length > 0) {
+          analysisArrows = [];
+          analysisArrowStart = null;
+          renderAnalysisArrows();
+        }
+
         // W normalnej grze
         if (!G.gameOver && !G.analyzing) {
           handleNormalMove(x, y);
           return;
         }
 
-        // W trybie analizy - włącz what-if jeśli nie aktywny
-        if (G.analyzing && G.whatIfRounds < 4) {
+        // W trybie analizy - włącz what-if jeśli nie aktywny (bez limitu ruchów)
+        if (G.analyzing) {
           if (!G.whatIfMode) {
             startWhatIfMode();
           }
@@ -3870,10 +4028,6 @@
 
       function executeWhatIfMoveAction() {
         if (G.plannedPath.length < 2) return;
-        if (G.whatIfRounds >= 4) {
-          resetWhatIfMode();
-          return;
-        }
 
         var startPos = G.selectedPiece;
         var endPos = G.plannedPath[G.plannedPath.length - 1];
@@ -3945,13 +4099,6 @@
 
         G.whatIfRounds++;
         updateWhatIfDisplay();
-
-        // Po 4 rundach automatyczny reset
-        if (G.whatIfRounds >= 4) {
-          setTimeout(function () {
-            resetWhatIfMode();
-          }, 1000);
-        }
 
         renderBoard();
         updateUI();
@@ -4658,7 +4805,7 @@
         resetGame();
       }
 
-      // Inicjalizacja XD
+      // Inicjalizacja
       initProfile();
       checkLobbyUrl();
       initBoard();
