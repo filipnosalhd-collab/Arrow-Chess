@@ -900,6 +900,34 @@
       .leave-lobby-btn:hover {
         background: rgba(255, 0, 170, 0.2);
       }
+      .lobby-settings {
+        margin: 15px 0;
+        padding: 15px;
+        background: var(--bg-light);
+      }
+      .lobby-settings h3 {
+        font-family: "Orbitron", monospace;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        margin-bottom: 10px;
+      }
+      .lobby-time-btns,
+      .lobby-inc-btns {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .lobby-time-btn,
+      .lobby-inc-btn {
+        padding: 8px 12px;
+        font-size: 0.75rem;
+      }
+      .lobby-settings-display {
+        color: var(--accent-cyan);
+        font-size: 0.9rem;
+        margin: 10px 0;
+      }
       .pending-captures {
         margin-top: 12px;
         padding: 10px;
@@ -1464,6 +1492,43 @@
               <span class="player-name">Oczekiwanie...</span>
               <span class="player-status">⏳</span>
             </div>
+          </div>
+          <div class="lobby-settings" id="lobby-settings">
+            <h3>⏱️ Czas na partię</h3>
+            <div class="time-options lobby-time-btns">
+              <button class="time-btn lobby-time-btn" data-time="0">∞</button>
+              <button class="time-btn lobby-time-btn" data-time="3">
+                3 min
+              </button>
+              <button class="time-btn lobby-time-btn selected" data-time="5">
+                5 min
+              </button>
+              <button class="time-btn lobby-time-btn" data-time="10">
+                10 min
+              </button>
+              <button class="time-btn lobby-time-btn" data-time="15">
+                15 min
+              </button>
+            </div>
+            <div class="increment-options lobby-inc-btns" id="lobby-increment">
+              <h3>⏱️ Bonus za ruch</h3>
+              <button class="inc-btn lobby-inc-btn" data-inc="0">+0s</button>
+              <button class="inc-btn lobby-inc-btn selected" data-inc="2">
+                +2s
+              </button>
+              <button class="inc-btn lobby-inc-btn" data-inc="3">+3s</button>
+              <button class="inc-btn lobby-inc-btn" data-inc="5">+5s</button>
+            </div>
+          </div>
+          <div
+            class="lobby-settings-display"
+            id="lobby-settings-display"
+            style="display: none"
+          >
+            <p>
+              ⏱️ Czas: <span id="lobby-time-display">5 min</span> | Bonus:
+              <span id="lobby-inc-display">+2s</span>
+            </p>
           </div>
           <p class="waiting-text" id="waiting-text">
             Czekam na drugiego gracza...
@@ -2543,6 +2608,8 @@
       let peer = null;
       let peerConnection = null;
       let myColor = null; // 'white' lub 'black'
+      let lobbyTimeLimit = 5; // Domyślny czas w lobby
+      let lobbyIncrement = 2; // Domyślny increment w lobby
 
       // Inicjalizacja profilu
       function initProfile() {
@@ -2714,6 +2781,19 @@
 
         var startBtn = document.getElementById("start-online-btn");
         var waitingText = document.getElementById("waiting-text");
+        var lobbySettings = document.getElementById("lobby-settings");
+        var lobbySettingsDisplay = document.getElementById(
+          "lobby-settings-display"
+        );
+
+        // Host widzi przyciski wyboru, gość widzi tylko info
+        if (isHost) {
+          lobbySettings.style.display = "block";
+          lobbySettingsDisplay.style.display = "none";
+        } else {
+          lobbySettings.style.display = "none";
+          lobbySettingsDisplay.style.display = "block";
+        }
 
         if (!isHost) {
           startBtn.style.display = "none";
@@ -2769,13 +2849,17 @@
       function startOnlineGame() {
         if (!isHost || onlinePlayers.length < 2) return;
 
-        // Wyślij info o starcie do gościa
-        sendPeerData({ type: "start", timeLimit: 5, increment: 2 });
+        // Wyślij info o starcie do gościa z wybranymi ustawieniami
+        sendPeerData({
+          type: "start",
+          timeLimit: lobbyTimeLimit,
+          increment: lobbyIncrement,
+        });
 
         // Startuj grę lokalnie
         G.gameMode = "online";
-        G.timeLimit = 5;
-        G.increment = 2;
+        G.timeLimit = lobbyTimeLimit;
+        G.increment = lobbyIncrement;
         resetGame();
         showScreen("game");
       }
@@ -2892,8 +2976,13 @@
               { name: data.name, isHost: false },
             ];
             updateLobbyUI();
-            // Potwierdź dołączenie
-            sendPeerData({ type: "joined", hostName: playerProfile });
+            // Potwierdź dołączenie i wyślij ustawienia
+            sendPeerData({
+              type: "joined",
+              hostName: playerProfile,
+              timeLimit: lobbyTimeLimit,
+              increment: lobbyIncrement,
+            });
             break;
 
           case "joined":
@@ -2902,6 +2991,12 @@
               { name: data.hostName, isHost: true },
               { name: playerProfile, isHost: false },
             ];
+            // Wyświetl ustawienia hosta
+            var timeDisplay = document.getElementById("lobby-time-display");
+            var incDisplay = document.getElementById("lobby-inc-display");
+            timeDisplay.textContent =
+              data.timeLimit > 0 ? data.timeLimit + " min" : "∞";
+            incDisplay.textContent = "+" + data.increment + "s";
             updateLobbyUI();
             break;
 
@@ -4432,30 +4527,67 @@
           G.difficulty = btn.dataset.diff;
         });
       });
-      document.querySelectorAll(".time-btn").forEach(function (btn) {
+      // Menu time buttons (nie lobby)
+      document
+        .querySelectorAll("#time-select .time-btn")
+        .forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            document
+              .querySelectorAll("#time-select .time-btn")
+              .forEach(function (b) {
+                b.classList.remove("selected");
+              });
+            btn.classList.add("selected");
+            G.timeLimit = parseInt(btn.dataset.time);
+            if (G.timeLimit > 0) {
+              document.getElementById("increment-select").style.display =
+                "block";
+            } else {
+              document.getElementById("increment-select").style.display =
+                "none";
+              G.increment = 0;
+              startGame();
+            }
+          });
+        });
+      document
+        .querySelectorAll("#increment-select .inc-btn")
+        .forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            document
+              .querySelectorAll("#increment-select .inc-btn")
+              .forEach(function (b) {
+                b.classList.remove("selected");
+              });
+            btn.classList.add("selected");
+            G.increment = parseInt(btn.dataset.inc);
+            startGame();
+          });
+        });
+      // Lobby time buttons
+      document.querySelectorAll(".lobby-time-btn").forEach(function (btn) {
         btn.addEventListener("click", function () {
-          document.querySelectorAll(".time-btn").forEach(function (b) {
+          document.querySelectorAll(".lobby-time-btn").forEach(function (b) {
             b.classList.remove("selected");
           });
           btn.classList.add("selected");
-          G.timeLimit = parseInt(btn.dataset.time);
-          if (G.timeLimit > 0) {
-            document.getElementById("increment-select").style.display = "block";
+          lobbyTimeLimit = parseInt(btn.dataset.time);
+          var incSection = document.getElementById("lobby-increment");
+          if (lobbyTimeLimit > 0) {
+            incSection.style.display = "block";
           } else {
-            document.getElementById("increment-select").style.display = "none";
-            G.increment = 0;
-            startGame();
+            incSection.style.display = "none";
+            lobbyIncrement = 0;
           }
         });
       });
-      document.querySelectorAll(".inc-btn").forEach(function (btn) {
+      document.querySelectorAll(".lobby-inc-btn").forEach(function (btn) {
         btn.addEventListener("click", function () {
-          document.querySelectorAll(".inc-btn").forEach(function (b) {
+          document.querySelectorAll(".lobby-inc-btn").forEach(function (b) {
             b.classList.remove("selected");
           });
           btn.classList.add("selected");
-          G.increment = parseInt(btn.dataset.inc);
-          startGame();
+          lobbyIncrement = parseInt(btn.dataset.inc);
         });
       });
       document
