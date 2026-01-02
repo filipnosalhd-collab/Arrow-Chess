@@ -6033,8 +6033,12 @@
             }
             // Ruchy pionkami nie zmieniają licznika
             
+            console.log('finishMove: przed processPendingCaptures, currentPlayer:', G.currentPlayer);
             processPendingCaptures();
-            switchTurn();
+            console.log('finishMove: po processPendingCaptures, currentPlayer:', G.currentPlayer, 'gameOver:', G.gameOver);
+            if (!G.gameOver) {
+                switchTurn();
+            }
         }
         
         function processPendingCaptures() {
@@ -6042,6 +6046,7 @@
             var captureHappened = false;
             var captureDesc = '';
             var captureColor = '';
+            var gameEnded = false;
             
             // Sprawdź czy jakieś pole jest atakowane przez 2+ figury
             var attackCounts = {};
@@ -6063,7 +6068,7 @@
                         // Nexus pod podwójnym atakiem = mat
                         if (targetPiece.type === 'king') {
                             endGame(firstAttack.attackerColor, 'mat');
-                            return;
+                            return; // Tutaj return jest OK bo to zwykła pętla for
                         }
                         
                         // Zbij figurę
@@ -6093,6 +6098,7 @@
                         captureHappened = true;
                         captureDesc = 'Podwójny atak! ' + firstAttack.attackerSymbol + ' zbija ' + targetPiece.symbol + '!';
                         captureColor = firstAttack.attackerColor;
+                        console.log('PODWÓJNY ATAK! Zbito:', targetPiece.symbol, 'przez:', firstAttack.attackerSymbol);
                         
                         // Zapisz pozycje atakujących do podświetlenia na zielono
                         G.doubleAttackPieces = [];
@@ -6114,9 +6120,12 @@
                 }
             }
             
-            G.pendingCaptures.forEach(function(cap) {
+            // Przetwórz pozostałe blokady (używamy zwykłej pętli for zamiast forEach)
+            for (var i = 0; i < G.pendingCaptures.length; i++) {
+                var cap = G.pendingCaptures[i];
+                
                 // Pomiń już rozwiązane ataki
-                if (cap.resolved) return;
+                if (cap.resolved) continue;
                 
                 var targetPiece = G.board[cap.targetY] ? G.board[cap.targetY][cap.targetX] : null;
                 
@@ -6128,7 +6137,7 @@
                         G.board[cap.attackerY][cap.attackerX].symbol === cap.attackerSymbol) {
                         G.board[cap.attackerY][cap.attackerX] = null;
                     }
-                    return; // Nie dodawaj do newPending
+                    continue; // Nie dodawaj do newPending
                 }
                 
                 // Zmniejsz licznik tylko gdy to tura obrońcy
@@ -6139,7 +6148,8 @@
                         if (cap.isNexusLock) {
                             // Mat - Nexus nie uciekł w czasie
                             endGame(cap.attackerColor, 'mat');
-                            return;
+                            gameEnded = true;
+                            break; // Przerwij pętlę
                         }
                         (targetPiece.color === 'white' ? G.capturedByBlack : G.capturedByWhite).push(targetPiece);
                         G.board[cap.targetY][cap.targetX] = cap.attackerPiece;
@@ -6157,11 +6167,15 @@
                         captureHappened = true;
                         captureDesc = cap.attackerSymbol + ' zbija ' + targetPiece.symbol + '!';
                         captureColor = cap.attackerColor;
-                        return;
+                        console.log('ZBICIE PO CZASIE! Zbito:', targetPiece.symbol, 'przez:', cap.attackerSymbol);
+                        continue; // Nie dodawaj do newPending
                     }
                 }
                 newPending.push(cap);
-            });
+            }
+            
+            if (gameEnded) return;
+            
             G.pendingCaptures = newPending;
             G.inCheck = null;
             G.pendingCaptures.forEach(function(cap) {
@@ -6204,6 +6218,7 @@
         }
         
         function switchTurn() {
+            console.log('switchTurn: zmiana z', G.currentPlayer, 'na', G.currentPlayer === 'white' ? 'black' : 'white');
             G.currentPlayer = G.currentPlayer === 'white' ? 'black' : 'white';
             
             // Wyczyść podświetlenie podwójnego ataku
@@ -6748,7 +6763,10 @@
                 }
             }
             
-            if (allMoves.length === 0) return;
+            if (allMoves.length === 0) {
+                console.log('BOT ERROR: Brak ruchów! currentPlayer:', G.currentPlayer, 'gameOver:', G.gameOver);
+                return;
+            }
             
             // Sortuj i wybierz ruch zależnie od trudności
             allMoves.sort(function(a, b) { return b.score - a.score; });
