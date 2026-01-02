@@ -2568,12 +2568,6 @@
               (nie musi być z rzędu), gra kończy się remisem.
             </p>
             <p>
-              • <strong>Nexus zablokowany przez własne figury:</strong> Jeśli
-              Nexus jest pod szachem i wszystkie pola wokół niego (oprócz pola
-              atakującego) są zajęte przez <strong>własne figury</strong>, gra
-              kończy się remisem (nie matem!).
-            </p>
-            <p>
               • <strong>Propozycja remisu:</strong> W trybie online gracze mogą
               zaproponować remis. Jeśli przeciwnik zaakceptuje, gra kończy się
               remisem.
@@ -5536,63 +5530,7 @@
           }
         }
 
-        // 3. Nexus zablokowany przez własne figury przy szachu
-        if (G.inCheck) {
-          var ownBlockProximity = getOwnBlockProximity(G.inCheck);
-          if (ownBlockProximity > maxProximity)
-            maxProximity = ownBlockProximity;
-        }
-
         return Math.min(maxProximity, 1);
-      }
-
-      // Sprawdź jak blisko jest Nexus do bycia zablokowanym przez własne figury
-      function getOwnBlockProximity(kingColor) {
-        // Znajdź Nexusa
-        var kingX = -1,
-          kingY = -1;
-        for (var y = 0; y < 8; y++) {
-          for (var x = 0; x < 8; x++) {
-            var p = G.board[y][x];
-            if (p && p.type === "king" && p.color === kingColor) {
-              kingX = x;
-              kingY = y;
-              break;
-            }
-          }
-          if (kingX >= 0) break;
-        }
-        if (kingX < 0) return 0;
-
-        var directions = [
-          { dx: 0, dy: -1 },
-          { dx: 0, dy: 1 },
-          { dx: -1, dy: 0 },
-          { dx: 1, dy: 0 },
-          { dx: -1, dy: -1 },
-          { dx: 1, dy: -1 },
-          { dx: -1, dy: 1 },
-          { dx: 1, dy: 1 },
-        ];
-
-        var ownPiecesAround = 0;
-        var totalAdjacent = 0;
-
-        for (var i = 0; i < directions.length; i++) {
-          var nx = kingX + directions[i].dx;
-          var ny = kingY + directions[i].dy;
-          if (nx < 0 || nx > 7 || ny < 0 || ny > 7) continue;
-
-          totalAdjacent++;
-          var pieceAtPos = G.board[ny][nx];
-          if (pieceAtPos && pieceAtPos.color === kingColor) {
-            ownPiecesAround++;
-          }
-        }
-
-        // Im więcej własnych figur wokół Nexusa, tym bliżej do tego remisu
-        if (totalAdjacent === 0) return 0;
-        return (ownPiecesAround / totalAdjacent) * 0.8; // Max 0.8 bo potrzebny jeszcze szach
       }
 
       // Ocena jak blisko dany kolor jest do bycia zamatowanym
@@ -6686,100 +6624,6 @@
         return false;
       }
 
-      // Sprawdź czy Nexus jest zablokowany przez własne figury przy szachu (remis)
-      function checkStalemateByOwnPieces(
-        kingX,
-        kingY,
-        kingColor,
-        attackerX,
-        attackerY
-      ) {
-        // Wirtualny kwadrat 3x3 wokół króla
-        var directions = [
-          { dx: 0, dy: -1 },
-          { dx: 0, dy: 1 },
-          { dx: -1, dy: 0 },
-          { dx: 1, dy: 0 },
-          { dx: -1, dy: -1 },
-          { dx: 1, dy: -1 },
-          { dx: -1, dy: 1 },
-          { dx: 1, dy: 1 },
-        ];
-
-        // Znajdź wszystkie pola na ścieżce ataku w kwadracie 3x3
-        var attackPathInSquare = [];
-
-        // Kierunek ataku
-        var dx = kingX - attackerX;
-        var dy = kingY - attackerY;
-
-        // Normalizuj kierunek
-        var stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1;
-        var stepY = dy === 0 ? 0 : dy > 0 ? 1 : -1;
-
-        // Idź od atakującego do króla i zaznacz pola w kwadracie 3x3
-        var cx = attackerX;
-        var cy = attackerY;
-        var maxSteps = 10; // zabezpieczenie
-        while (maxSteps-- > 0) {
-          // Czy to pole jest w kwadracie 3x3 wokół króla?
-          if (Math.abs(cx - kingX) <= 1 && Math.abs(cy - kingY) <= 1) {
-            // Nie liczymy samego króla
-            if (cx !== kingX || cy !== kingY) {
-              attackPathInSquare.push({ x: cx, y: cy });
-            }
-          }
-
-          // Dotarliśmy do króla
-          if (cx === kingX && cy === kingY) break;
-
-          cx += stepX;
-          cy += stepY;
-        }
-
-        // Sprawdź czy maksymalnie 1 pole ataku jest w kwadracie
-        if (attackPathInSquare.length > 1) {
-          return false; // Za dużo pól ataku w kwadracie - nie remis
-        }
-
-        // Sprawdź wszystkie 8 pól w kwadracie
-        for (var i = 0; i < directions.length; i++) {
-          var nx = kingX + directions[i].dx;
-          var ny = kingY + directions[i].dy;
-
-          // Poza planszą - OK, to blokuje (krawędź)
-          if (nx < 0 || nx > 7 || ny < 0 || ny > 7) continue;
-
-          // Czy to pole jest na ścieżce ataku?
-          var isAttackPath = false;
-          for (var j = 0; j < attackPathInSquare.length; j++) {
-            if (
-              attackPathInSquare[j].x === nx &&
-              attackPathInSquare[j].y === ny
-            ) {
-              isAttackPath = true;
-              break;
-            }
-          }
-
-          // Pole na ścieżce ataku - pomijamy (to jest "strona bicia")
-          if (isAttackPath) continue;
-
-          // Sprawdź co jest na tym polu
-          var pieceAtPos = G.board[ny][nx];
-
-          // Jeśli pole jest puste LUB ma wroga = król mógłby tam uciec = NIE remis
-          if (!pieceAtPos || pieceAtPos.color !== kingColor) {
-            return false;
-          }
-
-          // Pole ma własną figurę - OK, blokuje
-        }
-
-        // Wszystkie pola (poza ścieżką ataku) są zablokowane przez własne figury lub krawędź
-        return true;
-      }
-
       function switchTurn() {
         G.currentPlayer = G.currentPlayer === "white" ? "black" : "white";
 
@@ -6813,20 +6657,6 @@
               target.type === "king" &&
               target.color === G.currentPlayer
             ) {
-              // Sprawdź czy Nexus jest zablokowany przez WŁASNE figury (remis)
-              if (
-                checkStalemateByOwnPieces(
-                  cap.targetX,
-                  cap.targetY,
-                  target.color,
-                  cap.attackerX,
-                  cap.attackerY
-                )
-              ) {
-                endGame(null, "ownblock");
-                return;
-              }
-
               // Nexus jest zablokowany - sprawdź czy ma bezpieczne pola do ucieczki
               var nexusMoves = getAllMovesForPiece(
                 cap.targetX,
@@ -7090,8 +6920,7 @@
         }
 
         // Remis = +30 ELO dla każdego
-        var isDrawType =
-          type === "pat" || type === "repetition" || type === "ownblock";
+        var isDrawType = type === "pat" || type === "repetition";
         if (isDrawType && (G.gameMode === "bot" || G.gameMode === "online")) {
           addElo(30, "Remis");
         }
@@ -7109,9 +6938,6 @@
         } else if (type === "repetition") {
           title = "REMIS!";
           message = "Potrójne powtórzenie pozycji figury!";
-        } else if (type === "ownblock") {
-          title = "REMIS!";
-          message = "Nexus zablokowany przez własne figury!";
         } else {
           title = "REMIS!";
           message =
