@@ -496,7 +496,7 @@
         }
         .piece:hover { transform: scale(1.18) translateY(-4px); }
         .piece:active { cursor: grabbing; transform: scale(1.22) translateY(-6px); }
-        .piece.attacking { opacity: 0.72; cursor: not-allowed; filter: saturate(0.65); }
+        .piece.attacking { opacity: 0.72; filter: saturate(0.65); }
         .piece.attacking:hover { transform: none; }
         .piece.white { 
             color: var(--white-piece);
@@ -1023,9 +1023,6 @@
         
         <div class="screen menu-screen active" id="menu-screen">
             <h2 class="menu-title">Wybierz Tryb Gry</h2>
-            <div class="f12-warning" style="background: linear-gradient(135deg, rgba(255,0,50,0.2), rgba(255,100,0,0.1)); border: 1px solid rgba(255,0,50,0.4); border-radius: 8px; padding: 10px 15px; margin-bottom: 15px; font-size: 0.85rem; color: #ff6b6b;">
-                ⚠️ <strong>UWAGA:</strong> Otworzenie konsoli (F12 / Ctrl+Shift+I) w trakcie partii = automatyczna przegrana!
-            </div>
             <div class="game-modes">
                 <div class="mode-card" data-mode="pvp">
                     <div class="mode-icon">⚔️</div>
@@ -1353,6 +1350,14 @@
                     <p>→ <strong>Natychmiastowe zbicie!</strong> Ofiara nie ma czasu na ucieczkę.</p>
                     <p>→ Pierwszy atakujący wchodzi na miejsce ofiary.</p>
                     <p>→ Podwójny atak na Nexusa = <strong>NATYCHMIASTOWY MAT!</strong></p>
+                </div>
+                
+                <h3>4.6. Łańcuch zbić (atak na atakującego)</h3>
+                <div class="highlight-box">
+                    <p>Gdy zaatakujesz figurę która <strong>sama kogoś atakuje</strong> (jest zamrożona w blokadzie):</p>
+                    <p>→ Atakujący <strong>natychmiast zbija</strong> swoją ofiarę i wchodzi na jej pole</p>
+                    <p>→ Ty zajmujesz <strong>miejsce atakującego</strong></p>
+                    <p>Przykład: Twój Drifter atakuje wrogiego Sentinela który blokuje Twojego pionka → Sentinel zbija pionka, Drifter zajmuje miejsce Sentinela!</p>
                 </div>
             </div>
 
@@ -5571,17 +5576,6 @@
         
         // Nasłuchuj Shift
         document.addEventListener('keydown', function(e) {
-            // BLOKADA F12 w trakcie partii - otworzenie konsoli = przegrana!
-            if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j'))) {
-                if (G.gameMode && !G.gameOver) {
-                    e.preventDefault();
-                    var loser = G.currentPlayer;
-                    var winner = loser === 'white' ? 'black' : 'white';
-                    endGame(winner, 'konsola');
-                    return;
-                }
-            }
-            
             if (e.key === 'Shift' && !isShiftDown) {
                 isShiftDown = true;
                 // Zacznij strzałkę od pola pod myszką
@@ -5930,8 +5924,49 @@
             }
             else if (targetPiece && targetPiece.color !== piece.color) {
                 madeAttack = true;
+                
+                // NOWA ZASADA: Atak na figurę która sama atakuje = łańcuch zbić!
+                // Atakujący zbija swoją ofiarę, a my zajmujemy jego miejsce
+                var targetIsAttacking = null;
+                for (var i = 0; i < G.pendingCaptures.length; i++) {
+                    var cap = G.pendingCaptures[i];
+                    if (cap.attackerX === endPos.x && cap.attackerY === endPos.y) {
+                        targetIsAttacking = cap;
+                        break;
+                    }
+                }
+                
+                if (targetIsAttacking) {
+                    // Łańcuch zbić!
+                    var victim = G.board[targetIsAttacking.targetY] ? G.board[targetIsAttacking.targetY][targetIsAttacking.targetX] : null;
+                    
+                    if (victim && victim.color !== targetPiece.color) {
+                        // 1. Atakujący (targetPiece) zbija swoją ofiarę
+                        (victim.color === 'white' ? G.capturedByBlack : G.capturedByWhite).push(victim);
+                        G.board[targetIsAttacking.targetY][targetIsAttacking.targetX] = targetPiece;
+                        if (!targetPiece.kills) targetPiece.kills = 0;
+                        targetPiece.kills++;
+                        
+                        // 2. My (piece) zajmujemy miejsce atakującego
+                        G.board[endPos.y][endPos.x] = piece;
+                        if (!piece.kills) piece.kills = 0;
+                        // Nie zwiększamy kills bo nie zbiliśmy nikogo bezpośrednio
+                        
+                        // 3. Usuń blokadę z pendingCaptures
+                        G.pendingCaptures.splice(i, 1);
+                        
+                        moveDesc = 'Łańcuch! ' + piece.symbol + ' wypycha ' + targetPiece.symbol + ' → ' + targetPiece.symbol + ' zbija ' + victim.symbol + '!';
+                        playSound('capture');
+                    } else {
+                        // Ofiara uciekła - normalny atak na atakującego
+                        G.pendingCaptures.push({ attackerX: startPos.x, attackerY: startPos.y, attackerColor: piece.color, attackerSymbol: piece.symbol, attackerPiece: JSON.parse(JSON.stringify(piece)), targetX: endPos.x, targetY: endPos.y, turnsLeft: 2, isNexusLock: false });
+                        G.board[startPos.y][startPos.x] = piece;
+                        moveDesc = moveDesc || (piece.symbol + ' blokuje ' + targetPiece.symbol + '!');
+                        playSound('capture');
+                    }
+                }
                 // Ofiara Phantom - natychmiastowe zbicie (Phantom nie może uciec)
-                if (targetPiece.type === 'queen') {
+                else if (targetPiece.type === 'queen') {
                     (targetPiece.color === 'white' ? G.capturedByBlack : G.capturedByWhite).push(targetPiece);
                     G.board[endPos.y][endPos.x] = piece;
                     // Licznik zbić
@@ -6446,8 +6481,7 @@
                     var stepsUsed = path.length; // path zawiera start, więc stepsUsed = ile kroków zrobiliśmy
                     var isThisLastStep = (stepsUsed >= piece.moves);
                     if (targetPiece && targetPiece.color !== piece.color) {
-                        // Nie można zbić figury która atakuje
-                        if (isPieceAttacking(newX, newY)) continue;
+                        // MOŻNA atakować figurę która sama atakuje (łańcuch zbić)
                         
                         // KLUCZOWA ZASADA: Figura pod atakiem NIE MOŻE atakować króla!
                         // To dotyczy wszystkich figur które są celem pendingCapture
@@ -6641,16 +6675,52 @@
             // Zamknij modal
             document.getElementById('game-over-modal').classList.remove('active');
             
-            // Reset gry
+            // Reset gry - PEŁNY RESET WSZYSTKIEGO
             rematchRequested = false;
             rematchAccepted = false;
+            
+            // Reset stanu gry
             initBoard();
             G.gameMode = 'online';
+            G.currentPlayer = 'white';
+            G.selectedPiece = null;
+            G.plannedPath = [];
+            G.usedDiagonal = false;
+            G.pendingCaptures = [];
+            G.capturedByWhite = [];
+            G.capturedByBlack = [];
+            G.moveHistory = [];
+            G.gameOver = false;
+            G.inCheck = null;
+            G.movesWithoutAttack = 0;
+            G.piecePositionHistory = {};
+            G.doubleAttackPieces = [];
+            G.sentinelShields = [];
+            G.lastMove = null;
+            G.evalBefore = 0;
+            G.gameStates = [];
+            G.currentStateIndex = -1;
+            G.analyzing = false;
+            G.whatIfMode = false;
+            
+            // Reset czasów
             G.timeLimit = lobbyTimeLimit * 60;
             G.increment = lobbyIncrement;
             G.whiteTime = G.timeLimit;
             G.blackTime = G.timeLimit;
+            if (G.timerInterval) clearInterval(G.timerInterval);
             startTimer();
+            
+            // Wyczyść historię ruchów w UI
+            var historyList = document.getElementById('history-list');
+            if (historyList) historyList.innerHTML = '';
+            
+            // Reset paska ewaluacji
+            var evalBar = document.getElementById('eval-bar');
+            if (evalBar) {
+                var evalFill = evalBar.querySelector('.eval-fill');
+                if (evalFill) evalFill.style.height = '50%';
+            }
             
             // Ustaw info o turze
             var turnInfo = document.getElementById('turn-info');
@@ -6658,9 +6728,13 @@
                 turnInfo.textContent = myColor === 'white' ? 'Twój ruch!' : 'Ruch przeciwnika...';
             }
             
+            // Zapisz początkowy stan
+            saveGameState('Start', 'white');
+            
             renderBoard();
             updateUI();
             updateTimerDisplay();
+            updateEvalBar();
         }
         
         function makeBotMove() {
